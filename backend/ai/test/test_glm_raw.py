@@ -12,7 +12,7 @@ def test_glm_connection():
     print("── Test 1: Basic connectivity ──")
 
     payload = {
-        "model": "glm-4",
+        "model": "ilmu-glm-5.1",
         "messages": [
             {"role": "user", "content": "Reply with exactly this JSON: {\"status\": \"alive\"}"}
         ],
@@ -70,7 +70,7 @@ def test_glm_latency():
     import time
 
     payload = {
-        "model": "glm-4",
+        "model": "ilmu-glm-5.1",
         "messages": [{"role": "user", "content": "Say OK"}],
         "max_tokens": 5,
     }
