@@ -1,68 +1,189 @@
-"""
-Business Cases Routes
-
-CRUD operations for business investigation cases.
-Each case represents a user's F&B business idea or existing business under review.
-"""
-# This file defines the API endpoints for managing business investigation cases.
-# The main functionalities include:
-# - Creating a new case when a user starts a new investigation.
-# - Listing all cases associated with the current user.
-# - Retrieving detailed information for a specific case, including facts, tasks, and AI recommendations.
-# - Updating case metadata (e.g., name, description).
-# - Deleting a case and all associated data when the user no longer needs it.
-# Each endpoint interacts with the database to perform the necessary operations on the 
-# case records. The endpoints are designed to be used by the frontend to allow users to
-# manage their business cases effectively through the application's interface.
-
-# For example, when a user creates a new case, the POST /api/cases/ endpoint will be
-#  called to create a new case record in the database and initialize the investigation
-#  session. When the user views their cases, the GET /api/cases/ endpoint will return a
-#  list of their cases. When they click on a specific case, the GET /api/cases/{case_id}
-#  endpoint will return detailed information about that case, including any facts that 
-# have been added, tasks that have been created, and the current AI recommendation. 
-# The PUT /api/cases/{case_id} endpoint allows users to update the case metadata, such
-#  as changing the name or description of the case. Finally, if the user decides to 
-# delete a case, the DELETE /api/cases/{case_id} endpoint will remove the case and all 
-# associated data from the database.
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from google.cloud import firestore
+from datetime import datetime
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
+from app.models.business_case import BusinessCase
+from app.schemas.business_case import CaseCreate
 
 router = APIRouter()
 
-
 @router.post("/")
-async def create_case(db=Depends(get_db)):
+async def create_case(
+    data: CaseCreate,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
     """Create a new business investigation case."""
-    # TODO: Create case record, initialize session
-    pass
-
+    uid = user["uid"]
+    case = BusinessCase(
+        user_id=uid,
+        title=data.title,
+        description=data.description,
+        mode=data.mode,
+        business_type=data.business_type,
+        target_location=data.target_location,
+        status="active"
+    )
+    case_dict = case.to_dict()
+    # Firestore generates an ID if we don't specify one in doc()
+    doc_ref = db.collection(BusinessCase.COLLECTION).document()
+    doc_ref.set(case_dict)
+    
+    # Return with ID
+    case_dict["id"] = doc_ref.id
+    return case_dict
 
 @router.get("/")
-async def list_cases(db=Depends(get_db)):
+async def list_cases(
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
     """List all business cases for the current user."""
-    # TODO: Return user's cases
-    pass
-
+    uid = user["uid"]
+    cases_ref = db.collection(BusinessCase.COLLECTION).where("user_id", "==", uid).stream()
+    
+    cases = []
+    for doc in cases_ref:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        cases.append(data)
+    
+    return cases
 
 @router.get("/{case_id}")
-async def get_case(case_id: str, db=Depends(get_db)):
+async def get_case(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
     """Get detailed info for a specific business case."""
-    # TODO: Return case details with facts, tasks, recommendation
-    pass
-
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    data = doc.to_dict()
+    if data.get("user_id") != user["uid"]:
+        raise HTTPException(status_code=403, detail="Not authorized to access this case")
+        
+    data["id"] = doc.id
+    return data
 
 @router.put("/{case_id}")
-async def update_case(case_id: str, db=Depends(get_db)):
-    """Update business case details."""
-    # TODO: Update case metadata
-    pass
-
+async def update_case(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc = doc_ref.get()
+    if not doc.exists or doc.to_dict().get("user_id") != user["uid"]:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    update_data = {**data, "updated_at": datetime.utcnow()}
+    # Remove id or user_id if they accidentally sent it
+    update_data.pop("id", None)
+    update_data.pop("user_id", None)
+    
+    doc_ref.update(update_data)
+    return {"status": "success"}
 
 @router.delete("/{case_id}")
-async def delete_case(case_id: str, db=Depends(get_db)):
-    """Delete a business case and all associated data."""
-    # TODO: Cascade delete
-    pass
+async def delete_case(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc = doc_ref.get()
+    if not doc.exists or doc.to_dict().get("user_id") != user["uid"]:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    doc_ref.delete()
+    return {"status": "success"}
+
+@router.post("/{case_id}/insight")
+async def save_insight(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"final_insight": data})
+    return {"status": "success"}
+
+@router.put("/{case_id}/status")
+async def update_status(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"status": data.get("status"), "updated_at": datetime.utcnow()})
+    return {"status": "success"}
+
+@router.post("/{case_id}/archive")
+async def archive_case(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"status": "archived", "updated_at": datetime.utcnow()})
+    return {"status": "success"}
+
+@router.post("/{case_id}/end_session")
+async def end_session(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    decision = data.get("decision")
+    status = "archived" if decision == "archive" else "insight_generated"
+    
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({
+        "status": status, 
+        "final_insight": data.get("insight"),
+        "updated_at": datetime.utcnow()
+    })
+    return {"status": "success"}
+
+@router.post("/{case_id}/reopen")
+async def reopen_case(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"status": "active", "updated_at": datetime.utcnow()})
+    return {"status": "success"}
+
+@router.put("/{case_id}/title")
+async def update_title(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"title": data.get("title"), "updated_at": datetime.utcnow()})
+    return {"status": "success"}
+
+@router.post("/{case_id}/checkpoint")
+async def save_checkpoint(
+    case_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    doc_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    doc_ref.update({"conversation_checkpoint": data, "updated_at": datetime.utcnow()})
+    return {"status": "success"}

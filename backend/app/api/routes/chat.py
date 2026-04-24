@@ -1,68 +1,99 @@
-"""
-Chat Session Routes
-
-Handles the iterative AI conversation flow.
-- Receives user messages
-- Triggers AI orchestration (follow-up questions, analysis, task generation)
-- Returns AI responses with structured data
-"""
-
-# This file defines the API endpoints for managing chat sessions between users and the
-#  AI. 
-# The main functionalities include:
-# - Starting a new chat session for a business case.
-# - Sending user messages to the AI and receiving responses.
-# - Retrieving message history for a session.
-# The send_message endpoint implements the full AI orchestration pipeline as described
-# in the SAD Section 8 Sequence. This includes storing user messages, building the AI
-# context, calling the GLM for reasoning, parsing the structured output, storing the AI
-# response and extracted data, and returning the response to the frontend. This allows
-# for an interactive conversation flow where the user can ask questions, receive insights,
-# and get actionable recommendations from the AI based on their business case. 
-# The endpoints in this file will be used by the frontend to facilitate the chat 
-# interface and ensure a seamless user experience when interacting with the AI.
-
-#For example, when a user starts a new chat session for a business case, the POST /api/cases/{case_id}/sessions endpoint will be called to create a new session and initialize the AI context. When the user sends a message, the POST /api/cases/{case_id}/sessions/{session_id}/messages endpoint will be called to process the message through the AI orchestration pipeline and return the response. The GET /api/cases/{case_id}/sessions/{session_id}/messages endpoint allows the frontend to retrieve the message history for that session, enabling users to see the full conversation with the AI.
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from google.cloud import firestore
+from datetime import datetime
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
+from app.models.business_case import BusinessCase
+from app.models.chat import ChatSession, ChatMessage
 
 router = APIRouter()
 
-
 @router.post("/{case_id}/sessions")
-async def create_session(case_id: str, db=Depends(get_db)):
-    """Start a new chat session for a business case."""
-    # TODO: Create session, initialize AI context
-    pass
+async def create_session(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    if not case_ref.get().exists:
+        raise HTTPException(status_code=404, detail="Case not found")
 
+    session = ChatSession(case_id=case_id)
+    session_dict = session.to_dict()
+    
+    doc_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document()
+    doc_ref.set(session_dict)
+    
+    session_dict["id"] = doc_ref.id
+    return session_dict
 
 @router.get("/{case_id}/sessions")
-async def list_sessions(case_id: str, db=Depends(get_db)):
-    """List all chat sessions for a business case."""
-    # TODO: Return sessions
-    pass
-
+async def list_sessions(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    sessions_ref = case_ref.collection(ChatSession.SUBCOLLECTION).stream()
+    
+    sessions = []
+    for doc in sessions_ref:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        sessions.append(data)
+        
+    return sessions
 
 @router.post("/{case_id}/sessions/{session_id}/messages")
-async def send_message(case_id: str, session_id: str, db=Depends(get_db)):
-    """
-    Send a user message and receive AI response.
-
-    Flow (SAD Section 8 Sequence):
-    1. Store user message
-    2. Build AI context (facts, summary, external data)
-    3. Call GLM for reasoning
-    4. Parse structured output (questions, facts, tasks, recommendation)
-    5. Store AI response and extracted data
-    6. Return response to frontend
-    """
-    # TODO: Implement full AI orchestration pipeline
-    pass
-
+async def send_message(
+    case_id: str, 
+    session_id: str, 
+    data: dict,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(session_id)
+    
+    # Store user message
+    user_msg = ChatMessage(
+        session_id=session_id,
+        role="user",
+        content=data.get("content", "")
+    )
+    user_msg_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).document()
+    user_msg_ref.set(user_msg.to_dict())
+    
+    # Store AI response (dummy text for basic CRUD integration)
+    ai_msg = ChatMessage(
+        session_id=session_id,
+        role="assistant",
+        content=f"Database-stored response to: {user_msg.content}"
+    )
+    ai_msg_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).document()
+    
+    ai_dict = ai_msg.to_dict()
+    ai_msg_ref.set(ai_dict)
+    
+    ai_dict["id"] = ai_msg_ref.id
+    return ai_dict
 
 @router.get("/{case_id}/sessions/{session_id}/messages")
-async def get_messages(case_id: str, session_id: str, db=Depends(get_db)):
-    """Retrieve message history for a session."""
-    # TODO: Return paginated messages
-    pass
+async def get_messages(
+    case_id: str, 
+    session_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(session_id)
+    messages_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).order_by("created_at").stream()
+    
+    messages = []
+    for doc in messages_ref:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        messages.append(data)
+        
+    return messages
