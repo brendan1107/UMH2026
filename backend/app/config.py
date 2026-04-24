@@ -5,6 +5,9 @@ Loads environment variables and provides typed settings
 for database, AI model, and external API configurations.
 """
 
+# What is config.py for?
+# The config.py file is responsible for loading environment variables and providing a structured, typed configuration for our application. It defines a Settings class using Pydantic's BaseSettings, which allows us to easily manage and access our application's configuration settings throughout the codebase. This includes settings for Firebase, the GLM AI model, Google API keys, authentication parameters, and CORS allowed origins. By centralizing our configuration in this file, we can keep our code organized and make it easier to manage different environments (development, staging, production) by simply changing the environment variables without needing to modify the code. This approach promotes clean code and makes it easier to maintain and update our application's configuration as needed.
+
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -20,6 +23,7 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
     FIREBASE_STORAGE_BUCKET: str = ""
+
 
     # --- AI Model (GLM) ---
     GLM_API_KEY: str = ""

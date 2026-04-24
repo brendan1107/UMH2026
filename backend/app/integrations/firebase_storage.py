@@ -5,6 +5,12 @@ Handles file uploads and downloads for evidence (images, documents).
 Uses Firebase Admin SDK's storage module.
 """
 
+# What is this app/integrations directory for?
+# The app/integrations directory contains code for integrating third-party services and APIs that our application relies on. This includes services like Firebase for storage and database, AI models for analysis, and Google APIs for calendar integration. By organizing our integration code in this directory, we can keep our application modular and maintainable, making it easier to manage external dependencies and interactions with third-party services.
+
+# What is this firebase_storage.py file for?
+# The firebase_storage.py file defines a client for interacting with Firebase Storage. It provides methods for uploading files, retrieving download URLs, deleting files, and checking if a file exists in storage. This client will be used in our API route handlers (e.g., in uploads.py) to manage evidence file uploads related to business cases. By encapsulating the Firebase Storage interactions in this client, we can keep our code organized and make it easier to manage file uploads across our application.
+
 from firebase_admin import storage
 from app.db.database import bucket
 

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+# What is api_place_result.py for?
+# The api_place_result.py file defines a data model for representing the results of Google Places API calls that we cache in our Firestore database. This model, ApiPlaceResult, includes fields for storing relevant information about a place, such as its name, address, coordinates, rating, and the raw API response data. By defining this model, we can easily serialize and deserialize place results when storing them in Firestore and retrieving them for use in our application. This caching mechanism helps us reduce redundant API calls to Google Places, improving performance and ensuring that we have access to place data even if there are issues with the external API.
 
 @dataclass
 class ApiPlaceResult:

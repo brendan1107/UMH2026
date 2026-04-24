@@ -8,6 +8,8 @@ Results are cached in api_place_results table (SAD Section 17).
 import httpx
 from app.config import settings
 
+# What is google_places.py for?
+# The google_places.py file defines a client for integrating with the Google Places API. This client will provide methods for searching nearby places based on latitude and longitude, retrieving detailed information about specific places, and performing text-based searches for places. This integration will allow us to gather contextual information about competitors and landmarks around the F&B locations in our business cases, which can be valuable for analysis and reporting. Additionally, we will implement caching of API results in the api_place_results table to improve performance and reduce redundant API calls, as outlined in SAD Section 17.
 
 class GooglePlacesClient:
     """Client for Google Places API."""

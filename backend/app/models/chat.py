@@ -10,7 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-
+# What is chat.py for?
+# The chat.py file defines data models for representing chat sessions and messages in our application. The ChatSession model represents a conversation thread associated with a specific business case, while the ChatMessage model represents individual messages within a chat session. These models include fields for storing relevant information such as the role of the message sender (user, assistant, system), the content of the message, any structured output (e.g., extracted facts or tasks), and timestamps. By defining these models, we can easily serialize and deserialize chat data when storing it in Firestore and retrieving it for use in our application. This allows us to maintain a history of conversations between users and the AI assistant, which can be valuable for context management, analysis, and reporting.
 @dataclass
 class ChatSession:
     """Firestore document schema for chat_sessions subcollection."""

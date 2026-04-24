@@ -8,7 +8,8 @@ Handles API calls, retries, and fallback behavior (SAD Section 13).
 import httpx
 from app.config import settings
 
-
+# What is this glm_client.py file for?
+# The glm_client.py file defines a client for interacting with the Z AI GLM model, which serves as the core reasoning engine for our application. This client will handle API calls to the GLM model, including sending chat completion requests and performing health checks. It will also implement retry logic and fallback behavior to ensure that our application can gracefully handle any issues with the GLM API, such as downtime or rate limits. By encapsulating the GLM interactions in this client, we can keep our code organized and make it easier to manage our AI model interactions across our application.
 class GLMClient:
     """Client for interacting with the GLM API."""
 

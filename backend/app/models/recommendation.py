@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List
 
+# What is recommendation.py for?
+# The recommendation.py file defines a data model for representing the recommendations generated for a business case. This model, Recommendation, includes fields for storing the verdict (e.g., proceed, reconsider), confidence score, summary, strengths, weaknesses, action items, and the full report. By defining this model, we can easily serialize and deserialize recommendation data when storing it in Firestore and retrieving it for use in our application. This allows us to manage the recommendations effectively, track their versions, and provide detailed insights to users based on the analysis of their business cases. The recommendations are stored in a subcollection under each business case, reflecting the hierarchical relationship between these entities in our Firestore database.
 
 @dataclass
 class Recommendation:

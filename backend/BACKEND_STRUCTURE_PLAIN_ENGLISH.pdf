@@ -1,0 +1,393 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 9 /Kids [7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R 19 0 R 21 0 R 23 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 2771 >>
+stream
+BT /F2 20 Tf 1 0 0 1 56 778.00 Tm (Backend Structure in Plain English) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 734.00 Tm (This document explains the backend in simple language. It is written for someone) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 718.00 Tm (who is new to backend development and wants a clear mental model before reading) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 702.00 Tm (code.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 670.00 Tm (1. What this backend is) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 638.00 Tm (The backend is the part of the project that handles:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 614.00 Tm (- API requests from the frontend) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 598.00 Tm (- authentication) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 582.00 Tm (- database access) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 566.00 Tm (- file uploads) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 550.00 Tm (- AI-related processing) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 534.00 Tm (- report generation) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 518.00 Tm (- integrations with outside services like Firebase and Google APIs) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 494.00 Tm (This project uses FastAPI as the web framework. That means the backend exposes) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 478.00 Tm (URLs such as /api/chat/... or /api/cases/..., and the frontend calls those URLs to) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 462.00 Tm (get or send data.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 430.00 Tm (2. The easiest way to think about the backend) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 398.00 Tm (Do not think about the backend as a big pile of folders. Think about it as a flow:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 374.00 Tm (1. A request comes in from the frontend.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 358.00 Tm (2. A route file receives the request.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 342.00 Tm (3. A service file should contain the main business logic.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 326.00 Tm (4. Models and schemas describe the data.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 310.00 Tm (5. The database layer talks to Firebase.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 294.00 Tm (6. Integration files talk to external APIs.) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 278.00 Tm (7. The backend returns a response to the frontend.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 254.00 Tm (That is the main idea.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 222.00 Tm (3. The most important file to start with) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 190.00 Tm (If you only open one file first, open:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 166.00 Tm (app/main.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 142.00 Tm (Why?) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 118.00 Tm (Because it creates the FastAPI app and registers all the route groups. It shows) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 102.00 Tm (the main feature areas of the backend:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 78.00 Tm (- auth) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 1) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 2408 >>
+stream
+BT /F1 11 Tf 1 0 0 1 66 778.00 Tm (- cases) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 762.00 Tm (- chat) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 746.00 Tm (- tasks) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 730.00 Tm (- uploads) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 714.00 Tm (- reports) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 698.00 Tm (- calendar) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 674.00 Tm (This file is like the main door of the backend.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 642.00 Tm (4. High-level folder map) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 610.00 Tm (Here is what each major part is for.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 580.00 Tm (app/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 554.00 Tm (This is the actual application code.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 524.00 Tm (app/api/routes/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 498.00 Tm (This folder defines the API endpoints. Each file usually matches one feature area.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 474.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 450.00 Tm (- auth.py handles login or auth-related endpoints) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 434.00 Tm (- cases.py handles business case endpoints) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 418.00 Tm (- chat.py handles chat session endpoints) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 402.00 Tm (- tasks.py handles task endpoints) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 378.00 Tm (You can think of route files as the "reception desk". They receive requests and) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 362.00 Tm (decide which backend logic should run.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 332.00 Tm (app/services/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 306.00 Tm (This folder should contain the core business logic.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 282.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 258.00 Tm (- creating a case) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 242.00 Tm (- processing a chat message) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 226.00 Tm (- generating a report) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 210.00 Tm (- handling uploads) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 186.00 Tm (You can think of services as the "workers" that do the real job after the request) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 170.00 Tm (arrives.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 146.00 Tm (Important note: in this project, many service methods are still not fully) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 130.00 Tm (implemented. So the structure is good, but some parts are still scaffolding.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 100.00 Tm (app/schemas/) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 2) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 2565 >>
+stream
+BT /F1 11 Tf 1 0 0 1 56 778.00 Tm (These files define the shape of request and response data using Pydantic.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 754.00 Tm (In simple words:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 730.00 Tm (- what input the backend expects) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 714.00 Tm (- what output the backend returns) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 690.00 Tm (If the frontend sends data to an endpoint, the schema helps validate whether the) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 674.00 Tm (data format is correct.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 644.00 Tm (app/models/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 618.00 Tm (These files define internal data structures, mainly for Firestore documents.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 594.00 Tm (This backend uses Firebase Firestore, which is a document database. So these model) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 578.00 Tm (files describe what a stored document looks like.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 554.00 Tm (For example:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 530.00 Tm (- a chat session) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 514.00 Tm (- a chat message) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 498.00 Tm (- a business case) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 482.00 Tm (- an uploaded file) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 466.00 Tm (- a recommendation) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 436.00 Tm (app/db/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 410.00 Tm (This folder handles Firebase setup and database access.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 386.00 Tm (Important files:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 362.00 Tm (- database.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 346.00 Tm (- session.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 322.00 Tm (database.py initializes Firebase Admin and creates the Firestore client.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 306.00 Tm (session.py exposes helper functions that other parts of the app use to get the) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 290.00 Tm (database or storage bucket.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 260.00 Tm (app/dependencies.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 234.00 Tm (This file contains shared FastAPI dependencies.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 210.00 Tm (The main example here is user authentication. It reads the Authorization header,) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 194.00 Tm (verifies the Firebase token, and returns the current user information.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 164.00 Tm (app/integrations/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 138.00 Tm (This folder is for external services.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 114.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 90.00 Tm (- GLM AI client) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 3) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 2374 >>
+stream
+BT /F1 11 Tf 1 0 0 1 66 778.00 Tm (- Google Places) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 762.00 Tm (- Google Maps) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 746.00 Tm (- Google Calendar) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 730.00 Tm (- Firebase Storage) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 706.00 Tm (Think of this folder as the "outside world connectors".) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 676.00 Tm (app/ai/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 650.00 Tm (This folder is meant to contain the AI workflow.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 626.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 602.00 Tm (- building context for prompts) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 586.00 Tm (- calling the AI model) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 570.00 Tm (- parsing model output) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 554.00 Tm (- reviewing the result) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 538.00 Tm (- managing long conversation memory) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 514.00 Tm (This is important for the chat and investigation experience.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 484.00 Tm (app/utils/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 458.00 Tm (This folder contains helper code.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 434.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 410.00 Tm (- file processing) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 394.00 Tm (- validation helpers) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 378.00 Tm (- PDF generation helpers) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 354.00 Tm (These are support tools, not the main feature flow.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 324.00 Tm (tests/) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 298.00 Tm (This folder is for automated tests.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 274.00 Tm (In a mature project, tests prove that the backend works correctly. In this) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 258.00 Tm (project, the tests currently look more like placeholders than full coverage.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 226.00 Tm (5. How a request moves through the backend) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 194.00 Tm (Let us follow the normal path of a request.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 164.00 Tm (Step 1: frontend sends a request) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 138.00 Tm (The frontend might call an endpoint like:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 114.00 Tm (POST /api/chat/{case_id}/sessions/{session_id}/messages) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 90.00 Tm (That means the frontend wants to send a new chat message.) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 4) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 2647 >>
+stream
+BT /F2 12 Tf 1 0 0 1 56 778.00 Tm (Step 2: route file receives it) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 752.00 Tm (The route is defined in:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 728.00 Tm (app/api/routes/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 704.00 Tm (The route file is responsible for:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 680.00 Tm (- receiving the HTTP request) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 664.00 Tm (- reading path parameters or body data) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 648.00 Tm (- using dependencies like authentication) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 632.00 Tm (- calling the correct service) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 616.00 Tm (- returning a response) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 592.00 Tm (The route should stay thin. It should not contain a lot of business logic.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 562.00 Tm (Step 3: service layer should handle the real work) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 536.00 Tm (The main logic should go into:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 512.00 Tm (app/services/chat_service.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 488.00 Tm (That service should handle steps like:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 464.00 Tm (- storing the user message) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 448.00 Tm (- loading useful context) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 432.00 Tm (- calling the AI orchestration flow) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 416.00 Tm (- saving the AI response) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 400.00 Tm (- returning structured output) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 376.00 Tm (This is the layer where the real application rules should live.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 346.00 Tm (Step 4: schemas define the data format) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 320.00 Tm (For chat, data shapes are defined in:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 296.00 Tm (app/schemas/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 272.00 Tm (This is how the backend stays clear about input and output.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 242.00 Tm (Step 5: models represent stored data) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 216.00 Tm (For chat, stored data structures are in:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 192.00 Tm (app/models/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 168.00 Tm (These models describe how chat sessions and messages are stored in Firestore.) Tj ET
+BT /F2 12 Tf 1 0 0 1 56 138.00 Tm (Step 6: database and integrations are used when needed) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 112.00 Tm (If the service needs stored data, it uses the Firestore client from app/db/. If it) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 96.00 Tm (needs AI, Google APIs, or storage, it uses files from app/integrations/ or) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 80.00 Tm (app/ai/.) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 5) Tj ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Length 2642 >>
+stream
+BT /F2 12 Tf 1 0 0 1 56 778.00 Tm (Step 7: response goes back to the frontend) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 752.00 Tm (After the service finishes, the backend returns a response. The frontend then) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 736.00 Tm (shows the result to the user.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 704.00 Tm (6. What the data storage looks like) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 672.00 Tm (This project uses Firebase Firestore. Firestore stores data as collections and) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 656.00 Tm (documents, not SQL tables and rows.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 632.00 Tm (A simple example from this project:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 608.00 Tm (- users/{uid}) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 592.00 Tm (- business_cases/{case_id}) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 576.00 Tm (- business_cases/{case_id}/chat_sessions/{session_id}) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 560.00 Tm (- business_cases/{case_id}/chat_sessions/{session_id}/messages/{message_id}) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 536.00 Tm (So instead of doing SQL joins, the backend organizes data in nested document) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 520.00 Tm (paths.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 496.00 Tm (That matters because the code style is different from a normal SQL backend.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 464.00 Tm (7. What the config files do) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 432.00 Tm (Two very important files are:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 408.00 Tm (- app/config.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 392.00 Tm (- .env.example) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 368.00 Tm (app/config.py defines application settings. These settings are loaded from) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 352.00 Tm (environment variables.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 328.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 304.00 Tm (- Firebase project details) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 288.00 Tm (- API keys) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 272.00 Tm (- model settings) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 256.00 Tm (- CORS settings) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 232.00 Tm (.env.example shows what environment variables the project expects. Usually each) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 216.00 Tm (developer creates a local .env file from it.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 184.00 Tm (8. What is already good in this backend) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 152.00 Tm (The structure is actually good for learning because the layers are clearly) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 136.00 Tm (separated.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 112.00 Tm (Good things:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 88.00 Tm (- the project already has a sensible folder structure) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 6) Tj ET
+endstream
+endobj
+17 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 16 0 R >>
+endobj
+18 0 obj
+<< /Length 3115 >>
+stream
+BT /F1 11 Tf 1 0 0 1 66 778.00 Tm (- the route, service, model, schema idea is clean) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 762.00 Tm (- the app has clear feature areas) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 746.00 Tm (- the backend is already organized around real product features) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 730.00 Tm (- Firebase, AI, uploads, reports, and task flows are already planned) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 706.00 Tm (So even though the app is incomplete, the architecture is understandable.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 674.00 Tm (9. What is still incomplete or risky) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 642.00 Tm (This is important for you to know.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 618.00 Tm (The project is not a fully finished backend yet. Some parts are still skeleton) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 602.00 Tm (code.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 578.00 Tm (Examples:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 554.00 Tm (- many route handlers still contain pass) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 538.00 Tm (- many service methods still contain pass) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 522.00 Tm (- some route files still import SQLAlchemy even though the app uses Firestore) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 506.00 Tm (- Firebase initialization happens during import, which can make startup fail if) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 490.00 Tm (  credentials are missing) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 474.00 Tm (- tests are present, but they do not yet prove much behavior) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 450.00 Tm (This means:) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 426.00 Tm (you should separate "intended design" from "working implementation" in your mind.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 402.00 Tm (The intended design is mostly described in TECHNICAL_STRUCTURE.md. The actual) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 386.00 Tm (implementation is still catching up.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 354.00 Tm (10. Best order for a junior developer to study this) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 332.00 Tm (backend) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 300.00 Tm (Read the backend in this order:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 276.00 Tm (1. app/main.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 260.00 Tm (2. app/config.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 244.00 Tm (3. .env.example) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 228.00 Tm (4. app/db/database.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 212.00 Tm (5. app/db/session.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 196.00 Tm (6. app/dependencies.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 180.00 Tm (7. one route file, such as app/api/routes/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 164.00 Tm (8. the matching schema file, such as app/schemas/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 148.00 Tm (9. the matching model file, such as app/models/chat.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 132.00 Tm (10. the matching service file, such as app/services/chat_service.py) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 116.00 Tm (11. the AI and integration folders after that) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 92.00 Tm (Do not try to understand everything at once. Follow one feature from top to) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 76.00 Tm (bottom.) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 7) Tj ET
+endstream
+endobj
+19 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 18 0 R >>
+endobj
+20 0 obj
+<< /Length 2869 >>
+stream
+BT /F2 15 Tf 1 0 0 1 56 778.00 Tm (11. Best way to read one feature) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 746.00 Tm (Pick one feature such as chat, cases, or uploads.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 722.00 Tm (Then ask these questions:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 698.00 Tm (1. What URL does the frontend call?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 682.00 Tm (2. Which route file receives it?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 666.00 Tm (3. Which schema validates the data?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 650.00 Tm (4. Which service should perform the logic?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 634.00 Tm (5. Which model represents the stored data?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 618.00 Tm (6. Which database or external integration does it use?) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 602.00 Tm (7. What response is returned?) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 578.00 Tm (If you repeat this process for two or three features, the whole backend will start) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 562.00 Tm (making sense.) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 530.00 Tm (12. Simple mental model you can remember) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 498.00 Tm (If you want one short summary, use this:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 474.00 Tm (- main.py wires the app together) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 458.00 Tm (- routes/ receive requests) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 442.00 Tm (- services/ should do the real work) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 426.00 Tm (- schemas/ define API data shapes) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 410.00 Tm (- models/ define Firestore document shapes) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 394.00 Tm (- db/ connects to Firebase) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 378.00 Tm (- dependencies.py handles shared request logic like auth) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 362.00 Tm (- integrations/ talk to outside services) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 346.00 Tm (- ai/ runs the AI workflow) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 330.00 Tm (- utils/ hold helper code) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 314.00 Tm (- tests/ are for verification) Tj ET
+BT /F2 15 Tf 1 0 0 1 56 282.00 Tm (13. Final advice for you) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 250.00 Tm (Since you are new, do not worry about understanding every line of code) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 234.00 Tm (immediately. Your first goal is to understand the responsibility of each layer.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 210.00 Tm (Once you know:) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 186.00 Tm (- where requests enter) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 170.00 Tm (- where logic should live) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 154.00 Tm (- where data is stored) Tj ET
+BT /F1 11 Tf 1 0 0 1 66 138.00 Tm (- where outside services are called) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 114.00 Tm (you already understand the backend at a useful junior level.) Tj ET
+BT /F1 11 Tf 1 0 0 1 56 90.00 Tm (After that, you can learn each feature one by one.) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 8) Tj ET
+endstream
+endobj
+21 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 20 0 R >>
+endobj
+22 0 obj
+<< /Length 143 >>
+stream
+BT /F1 11 Tf 1 0 0 1 56 778.00 Tm (That is the correct way to approach a backend like this.) Tj ET
+BT /F1 9 Tf 1 0 0 1 504 42 Tm (Page 9) Tj ET
+endstream
+endobj
+23 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 22 0 R >>
+endobj
+xref
+0 24
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000176 00000 n 
+0000000246 00000 n 
+0000000321 00000 n 
+0000000389 00000 n 
+0000003212 00000 n 
+0000003358 00000 n 
+0000005818 00000 n 
+0000005964 00000 n 
+0000008582 00000 n 
+0000008730 00000 n 
+0000011157 00000 n 
+0000011305 00000 n 
+0000014005 00000 n 
+0000014153 00000 n 
+0000016848 00000 n 
+0000016996 00000 n 
+0000020164 00000 n 
+0000020312 00000 n 
+0000023234 00000 n 
+0000023382 00000 n 
+0000023577 00000 n 
+trailer
+<< /Size 24 /Root 1 0 R >>
+startxref
+23725
+%%EOF

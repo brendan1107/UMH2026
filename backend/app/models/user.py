@@ -9,7 +9,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Optional
 
-
+# What is user.py for?
+# The user.py file defines a data model for representing users in our application. This model, User, includes fields for storing relevant information about a user, such as their Firebase Auth UID, email, full name, and timestamps for when the user document was created and last updated. By defining this model, we can easily serialize and deserialize user data when storing it in Firestore and retrieving it for use in our application. This allows us to manage user profiles effectively and link them to their associated business cases and other related data in our Firestore database. The user's UID serves as the unique identifier for their document in the "users" collection, ensuring that we can efficiently query and manage user data based on their authentication status.
 @dataclass
 class User:
     """Firestore document schema for users collection."""

@@ -7,6 +7,8 @@ Allows users to save AI-generated investigation tasks to Google Calendar.
 Fallback: allow manual copy of task details if Calendar fails (SAD Section 13).
 """
 
+# What is google_calendar.py for?
+# The google_calendar.py file defines a client for integrating with the Google Calendar API. This client will provide methods for handling OAuth2 authentication, creating calendar events from investigation tasks, and deleting calendar events when tasks are completed or canceled. This integration allows users to easily schedule their investigation tasks on their Google Calendar, helping them stay organized and manage their time effectively as they work through their F&B business cases. Additionally, we will implement fallback behavior to allow users to manually copy task details if the Calendar integration fails, ensuring that they can still manage their tasks even if there are issues with the API.
 from app.config import settings
 
 

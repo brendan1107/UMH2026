@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+# What is extracted_fact.py for?
+# The extracted_fact.py file defines a data model for representing structured facts that are extracted from user inputs, chat messages, or external data sources in relation to a business case. This model, ExtractedFact, includes fields for categorizing the fact (e.g., location, pricing, competition, finance), storing the key-value pair of the fact, indicating the confidence level (user-provided, AI-inferred, verified), and the source of the fact (user input, Google Places API, field task). By defining this model, we can easily serialize and deserialize extracted facts when storing them in Firestore and retrieving them for use in our application. These extracted facts serve as structured memory that helps us manage the GLM's shorter context window by providing concise and relevant information that can be referenced during conversations and analysis without needing to include lengthy chat histories. This allows us to maintain important information about the business case in a structured format that can be easily accessed and utilized by the AI assistant and other components of our application.
 
 @dataclass
 class ExtractedFact:

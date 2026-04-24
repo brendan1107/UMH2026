@@ -4,6 +4,8 @@ Business Case Model (Firestore Document Schema)
 Collection: business_cases/{case_id}
 Supports both pre-launch and existing business modes (PRD Section 4.1).
 """
+# What is business_case.py for?
+# The business_case.py file defines a data model for representing a business case in our application. This model, BusinessCase, includes fields for storing relevant information about a business case, such as the user ID of the creator, title, description, mode (pre-launch or existing business), business type, target location, status, and timestamps for creation and updates. By defining this model, we can easily serialize and deserialize business case data when storing it in Firestore and retrieving it for use in our application. This model serves as the core entity around which all other related data (chat sessions, extracted facts, recommendations, evidence uploads, place results) is organized in our Firestore database.
 
 from dataclasses import dataclass, field
 from datetime import datetime

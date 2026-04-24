@@ -5,6 +5,9 @@ Provides shared dependencies such as Firestore client,
 authenticated user context, and service instances.
 """
 
+# What is dependencies.py for?
+# The dependencies.py file in the app directory is responsible for defining shared dependencies that can be injected into our API route handlers using FastAPI's dependency injection system. This includes functions for accessing the Firestore client, retrieving the current authenticated user from the request context, and providing instances of our service classes (ReportService, TaskService, UploadService). By centralizing these dependencies in one file, we can easily manage and reuse them across our API routes, keeping our code organized and promoting a clear separation of concerns. This allows us to maintain clean and efficient API route handlers while delegating the underlying mechanics of database access and user authentication to these shared dependencies.
+
 from fastapi import Depends, HTTPException, Request, status
 from firebase_admin import auth as firebase_auth
 

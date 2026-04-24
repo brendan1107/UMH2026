@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+# What is report_export.py for?
+# The report_export.py file defines a data model for representing exported reports in our application. This model, ReportExport, includes fields for storing relevant information about the exported report, such as the associated business case ID, file name, storage path in Firebase Storage, download URL, file size, format (e.g., PDF), and the timestamp of when the report was created. By defining this model, we can easily serialize and deserialize report export data when storing it in Firestore and retrieving it for use in our application. This allows us to manage generated reports effectively, link them to the relevant business cases, and provide users with access to their exported reports through download URLs. The actual report files are stored in Firebase Storage, while the metadata is stored in Firestore for easy querying and association with business cases.
 
 @dataclass
 class ReportExport:

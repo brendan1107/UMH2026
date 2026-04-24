@@ -1,1 +1,3 @@
 # API Route Modules
+# What is init.py for?
+# The __init__.py file in the app/api/routes directory serves as a central place to import and organize all the individual route modules (auth, cases, chat, tasks, uploads, reports, calendar). By importing these modules in __init__.py, we can easily include them in our main application (main.py) with a single import statement. This helps keep our code organized and makes it easier to manage our API routes as our application grows.

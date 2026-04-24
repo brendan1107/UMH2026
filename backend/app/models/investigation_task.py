@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-
+# What is investigation_task.py for?
+# The investigation_task.py file defines a data model for representing investigation tasks that are generated as part of the recommendations for a business case. This model, InvestigationTask, includes fields for storing relevant information about a task, such as its title, description, location, priority, status, findings, associated calendar event ID (if scheduled), due date, and timestamps. By defining this model, we can easily serialize and deserialize investigation task data when storing it in Firestore and retrieving it for use in our application. This allows us to manage the lifecycle of investigation tasks effectively, track their progress, and integrate with calendar scheduling features to help users stay organized as they work through their F&B business cases. The tasks are stored in a subcollection under each recommendation, which in turn is under each business case, reflecting the hierarchical relationship between these entities in our Firestore database.
 @dataclass
 class InvestigationTask:
     """Firestore document schema for investigation tasks subcollection."""
