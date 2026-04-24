@@ -1,87 +1,85 @@
-# PDF generation
-
 # app/ai/report.py
-# pip install weasyprint jinja2
-from jinja2 import Template
-from weasyprint import HTML
+#pip install reportlab
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.enums import TA_LEFT
+import io
+
 from app.ai.schemas import BusinessCase, AuditResult
 
-REPORT_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-  body { font-family: sans-serif; padding: 40px; color: #111; }
-  h1   { font-size: 28px; margin-bottom: 4px; }
-  .verdict-GO    { color: #15803d; }
-  .verdict-PIVOT { color: #b45309; }
-  .verdict-STOP  { color: #b91c1c; }
-  .section { margin-top: 32px; }
-  .section h2 { font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-  td, th { padding: 8px 12px; border: 1px solid #eee; text-align: left; }
-  th { background: #f9f9f9; font-weight: 600; }
-  .risk-high   { color: #b91c1c; }
-  .risk-medium { color: #b45309; }
-  .risk-low    { color: #1d4ed8; }
-</style>
-</head>
-<body>
+VERDICT_COLORS = {
+    "GO":    colors.HexColor("#15803d"),
+    "PIVOT": colors.HexColor("#b45309"),
+    "STOP":  colors.HexColor("#b91c1c"),
+}
 
-<h1>F&B Genie Feasibility Report</h1>
-<p style="color:#666;font-size:13px">{{ case.idea }} — {{ case.location }}</p>
+SEVERITY_COLORS = {
+    "high":   colors.HexColor("#b91c1c"),
+    "medium": colors.HexColor("#b45309"),
+    "low":    colors.HexColor("#1d4ed8"),
+}
 
-<div class="section">
-  <h2>Verdict</h2>
-  <p class="verdict-{{ verdict.decision }}" style="font-size:24px;font-weight:700">
-    {{ verdict.decision }}
-  </p>
-  <p>Confidence: {{ (verdict.confidence * 100) | round }}%</p>
-  <p>{{ verdict.summary }}</p>
-  {% if verdict.pivot_suggestion %}
-  <p><strong>Suggested pivot:</strong> {{ verdict.pivot_suggestion }}</p>
-  {% endif %}
-</div>
 
-<div class="section">
-  <h2>Key numbers</h2>
-  <table>
-    <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Competitors within 1km</td><td>{{ case.fact_sheet.competitor_count }}</td></tr>
-    <tr><td>Avg competitor rating</td><td>{{ case.fact_sheet.avg_competitor_rating }}/5</td></tr>
-    <tr><td>Estimated lunch footfall</td><td>{{ case.fact_sheet.estimated_footfall_lunch }} pax/hr</td></tr>
-    <tr><td>Break-even covers/day</td><td>{{ case.fact_sheet.break_even_covers }}</td></tr>
-    <tr><td>Months to break even</td><td>{{ case.fact_sheet.months_to_breakeven }}</td></tr>
-  </table>
-</div>
+async def generate_report(case: BusinessCase, verdict, audit: AuditResult) -> bytes:
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
 
-<div class="section">
-  <h2>Risk analysis</h2>
-  {% for risk in audit.risks %}
-  <div style="margin-bottom:16px;padding:12px;border:1px solid #eee;border-radius:8px">
-    <p class="risk-{{ risk.severity }}" style="font-weight:600;margin:0 0 4px">
-      [{{ risk.severity | upper }}] {{ risk.title }}
-    </p>
-    <p style="font-size:13px;margin:0 0 4px">{{ risk.reasoning }}</p>
-    <p style="font-size:12px;color:#2563eb;margin:0">Mitigation: {{ risk.mitigation }}</p>
-  </div>
-  {% endfor %}
-</div>
+    styles = getSampleStyleSheet()
+    story = []
 
-</body>
-</html>
-"""
+    # ── Title ──
+    story.append(Paragraph("F&B Genie Feasibility Report", styles["Title"]))
+    story.append(Paragraph(f"{case.idea} — {case.location}", styles["Normal"]))
+    story.append(Spacer(1, 0.5*cm))
 
-async def generate_report(
-    case: BusinessCase,
-    verdict,
-    audit: AuditResult,
-) -> bytes:
-    """Returns PDF bytes. Your teammate streams this to the browser."""
-    html_str = Template(REPORT_TEMPLATE).render(
-        case=case,
-        verdict=verdict,
-        audit=audit,
-    )
-    pdf_bytes = HTML(string=html_str).write_pdf()
-    return pdf_bytes
+    # ── Verdict ──
+    verdict_color = VERDICT_COLORS.get(verdict.decision, colors.black)
+    verdict_style = ParagraphStyle("verdict", fontSize=24, textColor=verdict_color, spaceAfter=6)
+    story.append(Paragraph("Verdict", styles["Heading2"]))
+    story.append(Paragraph(verdict.decision, verdict_style))
+    story.append(Paragraph(f"Confidence: {verdict.confidence * 100:.0f}%", styles["Normal"]))
+    story.append(Paragraph(verdict.summary, styles["Normal"]))
+    if verdict.pivot_suggestion:
+        story.append(Paragraph(f"<b>Suggested pivot:</b> {verdict.pivot_suggestion}", styles["Normal"]))
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── Key Numbers ──
+    story.append(Paragraph("Key Numbers", styles["Heading2"]))
+    fs = case.fact_sheet
+    table_data = [
+        ["Metric", "Value"],
+        ["Competitors within 1km",    str(fs.get("competitor_count", "—"))],
+        ["Avg competitor rating",     str(fs.get("avg_competitor_rating", "—")) + "/5"],
+        ["Estimated lunch footfall",  str(fs.get("estimated_footfall_lunch", "—")) + " pax/hr"],
+        ["Break-even covers/day",     str(fs.get("break_even_covers", "—"))],
+        ["Months to break even",      str(fs.get("months_to_breakeven", "—"))],
+    ]
+    table = Table(table_data, colWidths=[10*cm, 6*cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f9f9f9")),
+        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID",       (0, 0), (-1, -1), 0.5, colors.HexColor("#eeeeee")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
+        ("PADDING",    (0, 0), (-1, -1), 8),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── Risk Analysis ──
+    story.append(Paragraph("Risk Analysis", styles["Heading2"]))
+    for risk in audit.risks:
+        risk_color = SEVERITY_COLORS.get(risk.severity, colors.black)
+        label_style = ParagraphStyle("risk_label", textColor=risk_color, fontName="Helvetica-Bold", spaceAfter=2)
+        story.append(Paragraph(f"[{risk.severity.upper()}] {risk.title}", label_style))
+        story.append(Paragraph(risk.reasoning, styles["Normal"]))
+        story.append(Paragraph(f"<b>Mitigation:</b> {risk.mitigation}", styles["Normal"]))
+        story.append(Spacer(1, 0.3*cm))
+
+    doc.build(story)
+    return buffer.getvalue()
