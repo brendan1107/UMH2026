@@ -36,8 +36,6 @@ async def glm_call(
         raw = resp.json()
 
     content = raw["choices"][0]["message"]["content"]
-
-    # Strip markdown fences if GLM wraps in ```json
     content = content.strip()
     if content.startswith("```"):
         content = content.split("```")[1]
