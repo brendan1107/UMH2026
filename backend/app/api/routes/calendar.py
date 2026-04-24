@@ -1,51 +1,152 @@
-"""
-Google Calendar Routes
+"""Calendar scheduling routes."""
 
-Allows users to save AI-generated investigation tasks
-to their Google Calendar for scheduling site visits,
-competitor reviews, and evidence collection.
-"""
-# This file defines API endpoints for integrating with Google Calendar.
-# The main functionalities include:
-# - Handling the OAuth2 callback to obtain access tokens for Google Calendar.
-# - Scheduling investigation tasks as calendar events, allowing users to set reminders
-#  for site visits, competitor reviews, and evidence collection.
-# - Removing scheduled events from Google Calendar if a task is canceled or completed.
-# The endpoints defined in this file will interact with the Google Calendar API to 
-# create, manage, and delete calendar events based on the investigation tasks generated
-#  by the AI. This integration helps users stay organized and ensures they don't miss 
-# important deadlines for their business investigations.
+from datetime import datetime, timezone
 
-# For example, when the AI identifies a task that requires a site visit, the user can
-# choose to schedule that task on their Google Calendar directly from the app, which 
-# will create a calendar event with the task details and a reminder. If the user 
-# completes the task or decides to skip it, they can remove the event from their 
-# calendar to keep it up to date with their investigation progress. This seamless 
-# integration with Google Calendar enhances the user experience and helps users manage 
-# their time effectively as they work through their F&B business cases.
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field, field_validator
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
 
 router = APIRouter()
 
-
-@router.post("/auth/callback")
-async def calendar_auth_callback():
-    """Handle Google OAuth2 callback for Calendar access."""
-    # TODO: Exchange auth code for tokens
-    pass
+STRICT_TASK_LOOKUP = False
+_demo_schedules: dict[tuple[str, str, str], dict] = {}
 
 
-@router.post("/tasks/{task_id}/schedule")
-async def schedule_task(task_id: str, db=Depends(get_db)):
-    """Add an investigation task as a Google Calendar event."""
-    # TODO: Create calendar event from task details
-    pass
+class ScheduleTaskRequest(BaseModel):
+    caseId: str = Field(..., min_length=1)
+    title: str = Field(..., min_length=1)
+    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    time: str = Field(..., pattern=r"^\d{2}:\d{2}$")
+    notes: str | None = None
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, value: str) -> str:
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("date must be a valid YYYY-MM-DD date")
+        return value
+
+    @field_validator("time")
+    @classmethod
+    def validate_time(cls, value: str) -> str:
+        try:
+            datetime.strptime(value, "%H:%M")
+        except ValueError:
+            raise ValueError("time must be a valid 24-hour HH:MM time")
+        return value
 
 
-@router.delete("/events/{event_id}")
-async def remove_event(event_id: str):
-    """Remove a scheduled event from Google Calendar."""
-    # TODO: Delete calendar event
-    pass
+class ScheduleTaskResponse(BaseModel):
+    success: bool
+    taskId: str
+    status: str
+    calendarEventId: str
+    message: str
+
+
+def _uid(current_user: dict) -> str:
+    return current_user["uid"]
+
+
+def _mock_event_id(task_id: str) -> str:
+    suffix = task_id.removeprefix("task_")
+    return f"mock_event_{suffix}"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _store_demo_schedule(
+    uid: str,
+    task_id: str,
+    payload: ScheduleTaskRequest,
+    calendar_event_id: str,
+    scheduled_for: str,
+) -> None:
+    _demo_schedules[(uid, payload.caseId, task_id)] = {
+        "taskId": task_id,
+        "caseId": payload.caseId,
+        "userId": uid,
+        "title": payload.title,
+        "status": "scheduled",
+        "calendarEventId": calendar_event_id,
+        "scheduledFor": scheduled_for,
+        "notes": payload.notes,
+        "updatedAt": _utc_now(),
+    }
+
+
+def _schedule_success(task_id: str, calendar_event_id: str) -> dict:
+    return {
+        "success": True,
+        "taskId": task_id,
+        "status": "scheduled",
+        "calendarEventId": calendar_event_id,
+        "message": "Task scheduled successfully.",
+    }
+
+
+@router.post("/tasks/{task_id}/schedule", response_model=ScheduleTaskResponse)
+async def schedule_task(
+    task_id: str,
+    payload: ScheduleTaskRequest,
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Schedule a task.
+
+    TODO: Replace the mock event creation with Google Calendar API calls once
+    OAuth, token storage, refresh handling, and calendar selection are available.
+    """
+    uid = _uid(current_user)
+    calendar_event_id = _mock_event_id(task_id)
+    scheduled_for = f"{payload.date}T{payload.time}:00"
+
+    try:
+        if db is None:
+            _store_demo_schedule(uid, task_id, payload, calendar_event_id, scheduled_for)
+            return _schedule_success(task_id, calendar_event_id)
+
+        task_ref = (
+            db.collection("users")
+            .document(uid)
+            .collection("cases")
+            .document(payload.caseId)
+            .collection("tasks")
+            .document(task_id)
+        )
+        task_snapshot = task_ref.get()
+
+        if not task_snapshot.exists:
+            if STRICT_TASK_LOOKUP:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Task not found",
+                )
+            _store_demo_schedule(uid, task_id, payload, calendar_event_id, scheduled_for)
+            return _schedule_success(task_id, calendar_event_id)
+
+        task_ref.update(
+            {
+                "status": "scheduled",
+                "calendarEventId": calendar_event_id,
+                "scheduledFor": scheduled_for,
+                "scheduleTitle": payload.title,
+                "scheduleNotes": payload.notes,
+                "updatedAt": _utc_now(),
+            }
+        )
+
+        return _schedule_success(task_id, calendar_event_id)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected calendar scheduling failure",
+        )
