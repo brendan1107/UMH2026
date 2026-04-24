@@ -5,7 +5,7 @@ import os, json
 import httpx
 from app.ai.schemas import AgentOutput
 
-ZAI_BASE = "https://open.bigmodel.cn/api/paas/v4"  # ZAI endpoint
+ZAI_BASE = "https://api.ilmu.ai/v1"  # ZAI endpoint
 ZAI_KEY  = os.getenv("ZAI_API_KEY")
 
 async def glm_call(
@@ -17,7 +17,7 @@ async def glm_call(
     Retries once if the response fails Pydantic validation.
     """
     payload = {
-        "model": "glm-4",          # use whatever GLM model ZAI provides
+        "model": "ilmu-glm-5.1",          # use whatever GLM model ZAI provides
         "messages": [
             {"role": "system", "content": system},
             *messages,

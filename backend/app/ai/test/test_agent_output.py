@@ -7,8 +7,7 @@ from pydantic import ValidationError
 load_dotenv()
 
 ZAI_KEY  = os.getenv("ZAI_API_KEY")
-ZAI_BASE = "https://open.bigmodel.cn/api/paas/v4"
-
+ZAI_BASE = "https://api.ilmu.ai/v1"
 
 
 # ── Paste your actual schemas here for standalone testing ──
@@ -50,13 +49,13 @@ def call_glm(system: str, user: str) -> str:
         f"{ZAI_BASE}/chat/completions",
         headers={"Authorization": f"Bearer {ZAI_KEY}"},
         json={
-            "model": "glm-4",
+            "model": "ilmu-glm-5.1",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user",   "content": user},
             ],
             "temperature": 0.1,
-            "max_tokens": 500,
+            "max_tokens": 1000,
         },
         timeout=30,
     )
