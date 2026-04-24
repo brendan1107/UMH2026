@@ -29,22 +29,34 @@ from app.config import settings
 firebase_initialization_error: Exception | None = None
 
 credential_path = Path(settings.FIREBASE_CREDENTIALS_PATH)
+db = None
+bucket = None
 
 if credential_path.exists():
-    # Initialize Firebase Admin SDK
-    _cred = credentials.Certificate(str(credential_path))
-    _app = firebase_admin.initialize_app(_cred, {
-        "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
-    })
+    try:
+        # Initialize Firebase Admin SDK
+        _cred = credentials.Certificate(str(credential_path))
+        app_options = {}
+        if settings.FIREBASE_STORAGE_BUCKET:
+            app_options["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
+        _app = firebase_admin.initialize_app(_cred, app_options)
 
-    # Firestore client
-    db = firestore.client()
+        # Firestore client
+        db = firestore.client()
 
-    # Storage bucket
-    bucket = storage.bucket()
+        # Storage bucket
+        if settings.FIREBASE_STORAGE_BUCKET:
+            bucket = storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+        else:
+            firebase_initialization_error = ValueError(
+                "FIREBASE_STORAGE_BUCKET is not configured. Set it in "
+                "backend/.env or backend/.env.backend."
+            )
+    except Exception as exc:
+        firebase_initialization_error = exc
+        db = None
+        bucket = None
 else:
     firebase_initialization_error = FileNotFoundError(
         f"Firebase credentials file not found: {credential_path}"
     )
-    db = None
-    bucket = None
