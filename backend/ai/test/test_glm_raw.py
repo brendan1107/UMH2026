@@ -69,7 +69,7 @@ def test_glm_latency():
     import time
 
     payload = {
-        "model": "glm-4",
+        "model": "ilmu-glm-5.1",
         "messages": [{"role": "user", "content": "Say OK"}],
         "max_tokens": 5,
     }
