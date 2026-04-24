@@ -8,6 +8,7 @@ This is the main entry point for the iterative investigation workflow.
 import json
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from fastapi import HTTPException, status
 from google.cloud.firestore_v1 import Query
@@ -18,6 +19,9 @@ from app.models.chat import ChatMessage, ChatSession
 from app.models.extracted_fact import ExtractedFact
 from app.models.investigation_task import InvestigationTask
 from app.models.recommendation import Recommendation
+from app.services.mvp_store import store
+
+_DB_CLIENT_UNSET = object()
 
 # What is chat_service.py for?
 # The chat_service.py file defines a service class, ChatService, that contains the core business logic for managing chat sessions and processing messages between users and the AI. This includes functions for creating new chat sessions for business cases, processing user messages through the full AI orchestration pipeline (storing messages, building context, calling the GLM, parsing outputs, and returning responses), and retrieving message history for a session. By centralizing this logic in a service class, we can keep our API route handlers clean and focused on handling HTTP requests and responses, while the ChatService takes care of the underlying mechanics of managing chat interactions. This allows us to maintain a clear structure in our codebase and makes it easier to manage and update our chat-related logic as needed.
@@ -25,15 +29,18 @@ from app.models.recommendation import Recommendation
 class ChatService:
     """Service for chat session and message operations."""
 
+    _fallback_sessions: dict[tuple[str, str], dict[str, dict]] = {}
+    _fallback_messages: dict[tuple[str, str, str], list[dict]] = {}
+
     def __init__(
         self,
-        db_client: Any | None = None,
+        db_client: Any = _DB_CLIENT_UNSET,
         ai_orchestrator: Any | None = None,
     ):
-        self.db = db_client if db_client is not None else default_db
+        self.db = default_db if db_client is _DB_CLIENT_UNSET else db_client
         self.ai_orchestrator = ai_orchestrator
 
-    async def create_session(self, case_id: str):
+    async def create_session(self, case_id: str, user_id: str | None = None):
         """Initialize a new chat session for a case."""
         case_id = (case_id or "").strip()
         if not case_id:
@@ -41,23 +48,11 @@ class ChatService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Case ID is required",
             )
+        if self.db is None and user_id:
+            return self._fallback_create_session(user_id, case_id)
         self._require_firestore()
 
-        case_ref = self.db.collection(BusinessCase.COLLECTION).document(case_id)
-        try:
-            if not case_ref.get().exists:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Business case not found",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Failed to verify business case: {exc}",
-            )
-
+        case_ref = self._get_existing_case_ref(case_id, user_id=user_id)
         session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document()
         now = datetime.now(timezone.utc)
         session = ChatSession(
@@ -78,7 +73,13 @@ class ChatService:
 
         return self._serialize_session(session)
 
-    async def process_message(self, case_id: str, session_id: str, content: str):
+    async def process_message(
+        self,
+        case_id: str,
+        session_id: str,
+        content: str,
+        user_id: str | None = None,
+    ):
         """
         Process a user message through the full AI pipeline.
 
@@ -108,9 +109,20 @@ class ChatService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Message content is required",
             )
+        if self.db is None and user_id:
+            return await self._fallback_process_message(
+                user_id,
+                case_id,
+                session_id,
+                content,
+            )
         self._require_firestore()
 
-        case_ref, session_ref = self._get_existing_session_ref(case_id, session_id)
+        case_ref, session_ref = self._get_existing_session_ref(
+            case_id,
+            session_id,
+            user_id=user_id,
+        )
 
         user_message = self._create_message(
             session_ref=session_ref,
@@ -151,7 +163,7 @@ class ChatService:
             "stored_outputs": stored_outputs,
         }
 
-    async def list_sessions(self, case_id: str):
+    async def list_sessions(self, case_id: str, user_id: str | None = None):
         """List chat sessions for a business case."""
         case_id = (case_id or "").strip()
         if not case_id:
@@ -159,9 +171,17 @@ class ChatService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Case ID is required",
             )
+        if self.db is None and user_id:
+            self._require_fallback_case(user_id, case_id)
+            sessions = self._fallback_sessions.get((user_id, case_id), {})
+            return sorted(
+                sessions.values(),
+                key=lambda item: item["updated_at"],
+                reverse=True,
+            )
         self._require_firestore()
 
-        case_ref = self._get_existing_case_ref(case_id)
+        case_ref = self._get_existing_case_ref(case_id, user_id=user_id)
         session_docs = self._documents(
             case_ref.collection(ChatSession.SUBCOLLECTION),
             order_field="updated_at",
@@ -174,7 +194,12 @@ class ChatService:
             for doc in session_docs
         ]
 
-    async def get_session_history(self, case_id: str, session_id: str):
+    async def get_session_history(
+        self,
+        case_id: str,
+        session_id: str,
+        user_id: str | None = None,
+    ):
         """Retrieve message history with pagination."""
         case_id = (case_id or "").strip()
         session_id = (session_id or "").strip()
@@ -188,9 +213,18 @@ class ChatService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Session ID is required",
             )
+        if self.db is None and user_id:
+            self._require_fallback_session(user_id, case_id, session_id)
+            return list(
+                self._fallback_messages.get((user_id, case_id, session_id), [])
+            )
         self._require_firestore()
 
-        _, session_ref = self._get_existing_session_ref(case_id, session_id)
+        _, session_ref = self._get_existing_session_ref(
+            case_id,
+            session_id,
+            user_id=user_id,
+        )
         message_docs = self._documents(
             session_ref.collection(ChatMessage.SUBCOLLECTION),
             order_field="created_at",
@@ -209,14 +243,25 @@ class ChatService:
                 detail="Firestore is not configured",
             )
 
-    def _get_existing_case_ref(self, case_id: str):
-        case_ref = self.db.collection(BusinessCase.COLLECTION).document(case_id)
+    def _get_existing_case_ref(self, case_id: str, user_id: str | None = None):
+        refs = []
+        if user_id:
+            refs.append(
+                self.db.collection("users")
+                .document(user_id)
+                .collection("cases")
+                .document(case_id)
+            )
+        refs.append(self.db.collection(BusinessCase.COLLECTION).document(case_id))
+
         try:
-            if not case_ref.get().exists:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Business case not found",
-                )
+            for case_ref in refs:
+                if case_ref.get().exists:
+                    return case_ref
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business case not found",
+            )
         except HTTPException:
             raise
         except Exception as exc:
@@ -224,7 +269,6 @@ class ChatService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Failed to load business case: {exc}",
             )
-        return case_ref
 
     @staticmethod
     def _serialize_session(session: ChatSession) -> dict:
@@ -236,15 +280,14 @@ class ChatService:
             "updated_at": session.updated_at,
         }
 
-    def _get_existing_session_ref(self, case_id: str, session_id: str):
-        case_ref = self.db.collection(BusinessCase.COLLECTION).document(case_id)
+    def _get_existing_session_ref(
+        self,
+        case_id: str,
+        session_id: str,
+        user_id: str | None = None,
+    ):
+        case_ref = self._get_existing_case_ref(case_id, user_id=user_id)
         try:
-            if not case_ref.get().exists:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Business case not found",
-                )
-
             session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(
                 session_id
             )
@@ -262,6 +305,111 @@ class ChatService:
             )
 
         return case_ref, session_ref
+
+    def _require_fallback_case(self, user_id: str, case_id: str) -> dict:
+        case = store.get_case(user_id, case_id)
+        if case is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business case not found",
+            )
+        return case
+
+    def _fallback_create_session(self, user_id: str, case_id: str) -> dict:
+        self._require_fallback_case(user_id, case_id)
+        now = datetime.now(timezone.utc)
+        session_id = f"chat_sessions-{uuid4().hex}"
+        session = {
+            "id": session_id,
+            "case_id": case_id,
+            "summary": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        self._fallback_sessions.setdefault((user_id, case_id), {})[session_id] = session
+        self._fallback_messages[(user_id, case_id, session_id)] = []
+        return dict(session)
+
+    def _require_fallback_session(
+        self,
+        user_id: str,
+        case_id: str,
+        session_id: str,
+    ) -> dict:
+        self._require_fallback_case(user_id, case_id)
+        session = self._fallback_sessions.get((user_id, case_id), {}).get(session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat session not found",
+            )
+        return session
+
+    async def _fallback_process_message(
+        self,
+        user_id: str,
+        case_id: str,
+        session_id: str,
+        content: str,
+    ) -> dict:
+        session = self._require_fallback_session(user_id, case_id, session_id)
+        messages = self._fallback_messages.setdefault(
+            (user_id, case_id, session_id),
+            [],
+        )
+
+        user_message = self._fallback_message(session_id, "user", content)
+        messages.append(user_message)
+
+        ai_response = await self._process_with_ai(case_id, session_id, content)
+        ai_message_content = self._extract_ai_message(ai_response)
+        assistant_message = self._fallback_message(
+            session_id,
+            "assistant",
+            ai_message_content,
+            structured_output=ai_response,
+        )
+        messages.append(assistant_message)
+
+        session["updated_at"] = datetime.now(timezone.utc)
+        summary = self._extract_session_summary(ai_response)
+        if summary:
+            session["summary"] = summary
+
+        return {
+            "message": ai_message_content,
+            "follow_up_questions": ai_response.get("follow_up_questions"),
+            "extracted_facts": ai_response.get("extracted_facts"),
+            "generated_tasks": ai_response.get("generated_tasks"),
+            "recommendation_update": ai_response.get("recommendation_update"),
+            "user_message": user_message,
+            "assistant_message": assistant_message,
+            "stored_outputs": {
+                "facts": 0,
+                "tasks": 0,
+                "recommendation_id": None,
+            },
+        }
+
+    def _fallback_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        structured_output: dict | None = None,
+    ) -> dict:
+        return {
+            "id": f"messages-{uuid4().hex}",
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "structured_output": (
+                self._json_dumps(structured_output)
+                if structured_output is not None
+                else None
+            ),
+            "created_at": datetime.now(timezone.utc),
+        }
 
     @staticmethod
     def _documents(query: Any, order_field: str | None = None, descending: bool = False):

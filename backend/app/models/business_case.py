@@ -43,15 +43,19 @@ class BusinessCase:
     def from_dict(doc_id: str, data: dict) -> "BusinessCase":
         return BusinessCase(
             id=doc_id,
-            user_id=data.get("user_id", ""),
+            user_id=data.get("user_id") or data.get("userId", ""),
             title=data.get("title", ""),
             description=data.get("description"),
-            mode=data.get("mode", "pre_launch"),
-            business_type=data.get("business_type"),
-            target_location=data.get("target_location"),
+            mode=data.get("mode") or data.get("businessStage") or "pre_launch",
+            business_type=data.get("business_type") or data.get("businessType"),
+            target_location=data.get("target_location") or data.get("targetLocation"),
             status=data.get("status", "active"),
-            created_at=data.get("created_at", datetime.utcnow()),
-            updated_at=data.get("updated_at", datetime.utcnow()),
+            created_at=data.get("created_at")
+            or data.get("createdAt")
+            or datetime.utcnow(),
+            updated_at=data.get("updated_at")
+            or data.get("updatedAt")
+            or datetime.utcnow(),
         )
 
     COLLECTION = "business_cases"

@@ -13,20 +13,81 @@ from app.config import settings
 class GoogleMapsClient:
     """Client for Google Maps and Geocoding APIs."""
 
-    def __init__(self):
-        self.api_key = settings.GOOGLE_MAPS_API_KEY
+    def __init__(self, api_key: str | None = None, http_client_factory=None):
+        self.api_key = api_key if api_key is not None else settings.GOOGLE_MAPS_API_KEY
+        self.http_client_factory = http_client_factory or httpx.AsyncClient
 
     async def geocode(self, address: str):
         """Convert address to latitude/longitude coordinates."""
-        # TODO: Call Geocoding API
-        pass
+        if not address or not self.api_key:
+            return None
+        data = await self._get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            {"address": address, "key": self.api_key},
+        )
+        results = data.get("results") or []
+        if not results:
+            return None
+        first = results[0]
+        location = first.get("geometry", {}).get("location", {})
+        return {
+            "address": first.get("formatted_address"),
+            "latitude": location.get("lat"),
+            "longitude": location.get("lng"),
+            "raw": first,
+        }
 
     async def reverse_geocode(self, latitude: float, longitude: float):
         """Convert coordinates to human-readable address."""
-        # TODO: Call Reverse Geocoding API
-        pass
+        if latitude is None or longitude is None or not self.api_key:
+            return None
+        data = await self._get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            {"latlng": f"{latitude},{longitude}", "key": self.api_key},
+        )
+        results = data.get("results") or []
+        if not results:
+            return None
+        return {
+            "address": results[0].get("formatted_address"),
+            "place_id": results[0].get("place_id"),
+            "raw": results[0],
+        }
 
     async def get_directions(self, origin: str, destination: str):
         """Get transit/driving directions between two points."""
-        # TODO: Call Directions API (useful for accessibility analysis)
-        pass
+        if not origin or not destination or not self.api_key:
+            return None
+        data = await self._get(
+            "https://maps.googleapis.com/maps/api/directions/json",
+            {
+                "origin": origin,
+                "destination": destination,
+                "mode": "driving",
+                "key": self.api_key,
+            },
+        )
+        routes = data.get("routes") or []
+        if not routes:
+            return None
+        leg = (routes[0].get("legs") or [{}])[0]
+        return {
+            "distance": leg.get("distance"),
+            "duration": leg.get("duration"),
+            "start_address": leg.get("start_address"),
+            "end_address": leg.get("end_address"),
+            "raw": routes[0],
+        }
+
+    async def _get(self, url: str, params: dict) -> dict:
+        async with self.http_client_factory(timeout=15.0) as client:
+            response = await client.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("status") not in {None, "OK", "ZERO_RESULTS"}:
+            raise httpx.HTTPStatusError(
+                f"Google Maps API returned {data.get('status')}",
+                request=response.request,
+                response=response,
+            )
+        return data

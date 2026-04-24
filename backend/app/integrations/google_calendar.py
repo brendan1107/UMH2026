@@ -1,40 +1,140 @@
 """
-Google Calendar API Integration
+Google Calendar API integration.
 
-Allows users to save AI-generated investigation tasks to Google Calendar.
-(PRD Section 4.2: Task-to-Action Workflow)
-
-Fallback: allow manual copy of task details if Calendar fails (SAD Section 13).
+Provides OAuth URL generation, token exchange, event creation, and event
+deletion for investigation tasks.
 """
 
-# What is google_calendar.py for?
-# The google_calendar.py file defines a client for integrating with the Google Calendar API. This client will provide methods for handling OAuth2 authentication, creating calendar events from investigation tasks, and deleting calendar events when tasks are completed or canceled. This integration allows users to easily schedule their investigation tasks on their Google Calendar, helping them stay organized and manage their time effectively as they work through their F&B business cases. Additionally, we will implement fallback behavior to allow users to manually copy task details if the Calendar integration fails, ensuring that they can still manage their tasks even if there are issues with the API.
+from datetime import datetime, timedelta
+from urllib.parse import urlencode
+
+import httpx
+
 from app.config import settings
 
 
 class GoogleCalendarClient:
     """Client for Google Calendar API."""
 
-    def __init__(self):
-        self.client_id = settings.GOOGLE_CALENDAR_CLIENT_ID
-        self.client_secret = settings.GOOGLE_CALENDAR_CLIENT_SECRET
+    def __init__(
+        self,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        redirect_uri: str | None = None,
+        http_client_factory=None,
+    ):
+        self.client_id = (
+            client_id if client_id is not None else settings.GOOGLE_CALENDAR_CLIENT_ID
+        )
+        self.client_secret = (
+            client_secret
+            if client_secret is not None
+            else settings.GOOGLE_CALENDAR_CLIENT_SECRET
+        )
+        self.redirect_uri = (
+            redirect_uri
+            if redirect_uri is not None
+            else settings.GOOGLE_CALENDAR_REDIRECT_URI
+        )
+        self.http_client_factory = http_client_factory or httpx.AsyncClient
 
     async def get_auth_url(self) -> str:
         """Generate OAuth2 authorization URL for Calendar access."""
-        # TODO: Build Google OAuth2 URL
-        pass
+        if not self.client_id:
+            raise RuntimeError("GOOGLE_CALENDAR_CLIENT_ID is not configured")
+        params = {
+            "client_id": self.client_id,
+            "redirect_uri": self.redirect_uri,
+            "response_type": "code",
+            "scope": "https://www.googleapis.com/auth/calendar.events",
+            "access_type": "offline",
+            "prompt": "consent",
+        }
+        return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
     async def exchange_code(self, auth_code: str) -> dict:
         """Exchange authorization code for access/refresh tokens."""
-        # TODO: Token exchange
-        pass
+        if not auth_code:
+            raise ValueError("Authorization code is required")
+        if not self.client_id or not self.client_secret:
+            raise RuntimeError("Google Calendar OAuth credentials are not configured")
+
+        payload = {
+            "code": auth_code,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "redirect_uri": self.redirect_uri,
+            "grant_type": "authorization_code",
+        }
+        async with self.http_client_factory(timeout=15.0) as client:
+            response = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data=payload,
+            )
+        response.raise_for_status()
+        return response.json()
 
     async def create_event(self, access_token: str, task: dict) -> str:
         """Create a calendar event from an investigation task."""
-        # TODO: Create event, return event ID
-        pass
+        if not access_token:
+            raise ValueError("Google Calendar access token is required")
+
+        async with self.http_client_factory(timeout=15.0) as client:
+            response = await client.post(
+                "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json=self._build_event_payload(task),
+            )
+        response.raise_for_status()
+        return response.json()["id"]
 
     async def delete_event(self, access_token: str, event_id: str):
         """Delete a calendar event."""
-        # TODO: Delete event
-        pass
+        if not access_token:
+            raise ValueError("Google Calendar access token is required")
+        if not event_id:
+            raise ValueError("Calendar event ID is required")
+
+        async with self.http_client_factory(timeout=15.0) as client:
+            response = await client.delete(
+                f"https://www.googleapis.com/calendar/v3/calendars/primary/events/{event_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        if response.status_code not in {200, 204, 410}:
+            response.raise_for_status()
+        return {"deleted": True, "event_id": event_id}
+
+    @staticmethod
+    def _build_event_payload(task: dict) -> dict:
+        title = task.get("title") or task.get("scheduleTitle") or "Investigation task"
+        description = task.get("description") or task.get("notes") or ""
+        scheduled_for = (
+            task.get("scheduledFor")
+            or task.get("start")
+            or f"{task.get('date')}T{task.get('time', '09:00')}:00"
+        )
+        try:
+            starts_at = datetime.fromisoformat(
+                str(scheduled_for).replace("Z", "+00:00")
+            )
+        except ValueError:
+            starts_at = datetime.utcnow().replace(
+                hour=9,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+        ends_at = starts_at + timedelta(hours=1)
+        time_zone = task.get("timeZone", "UTC")
+        return {
+            "summary": title,
+            "description": description,
+            "start": {
+                "dateTime": starts_at.isoformat(),
+                "timeZone": time_zone,
+            },
+            "end": {
+                "dateTime": ends_at.isoformat(),
+                "timeZone": time_zone,
+            },
+        }

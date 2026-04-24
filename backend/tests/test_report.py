@@ -142,8 +142,8 @@ class FakeReportService:
         self.calls = []
         self.__class__.instances.append(self)
 
-    async def get_latest_report(self, case_id: str):
-        self.calls.append(("get_latest_report", case_id))
+    async def get_latest_report(self, case_id: str, user_id: str | None = None):
+        self.calls.append(("get_latest_report", case_id, user_id))
         return {
             "case_id": case_id,
             "recommendation": {"id": "rec-1", "summary": "Latest summary"},
@@ -151,8 +151,8 @@ class FakeReportService:
             "export": None,
         }
 
-    async def generate_full_report(self, case_id: str):
-        self.calls.append(("generate_full_report", case_id))
+    async def generate_full_report(self, case_id: str, user_id: str | None = None):
+        self.calls.append(("generate_full_report", case_id, user_id))
         return {
             "case_id": case_id,
             "recommendation": {"id": "rec-2", "summary": "Generated summary"},
@@ -160,8 +160,8 @@ class FakeReportService:
             "context": {"facts": []},
         }
 
-    async def export_pdf(self, case_id: str):
-        self.calls.append(("export_pdf", case_id))
+    async def export_pdf(self, case_id: str, user_id: str | None = None):
+        self.calls.append(("export_pdf", case_id, user_id))
         return {
             "case_id": case_id,
             "file_name": "fb-genie-report-case-123.pdf",
@@ -178,6 +178,9 @@ def build_report_test_client(monkeypatch, db):
     app = FastAPI()
     app.include_router(report_routes.router, prefix="/api/reports")
     app.dependency_overrides[report_routes.get_db] = lambda: db
+    app.dependency_overrides[report_routes.get_current_user] = lambda: {
+        "uid": "user-123"
+    }
     return TestClient(app)
 
 
@@ -420,7 +423,7 @@ def test_get_report_endpoint_calls_report_service(monkeypatch):
     }
     assert FakeReportService.instances[0].db_client is db
     assert FakeReportService.instances[0].calls == [
-        ("get_latest_report", "case-123")
+        ("get_latest_report", "case-123", "user-123")
     ]
 
 
@@ -439,7 +442,7 @@ def test_generate_report_endpoint_calls_report_service(monkeypatch):
     }
     assert FakeReportService.instances[0].db_client is db
     assert FakeReportService.instances[0].calls == [
-        ("generate_full_report", "case-123")
+        ("generate_full_report", "case-123", "user-123")
     ]
 
 
@@ -458,4 +461,6 @@ def test_export_report_pdf_endpoint_streams_pdf(monkeypatch):
     assert response.headers["x-report-export-id"] == "export-1"
     assert response.content == b"%PDF-1.4\nfake pdf"
     assert FakeReportService.instances[0].db_client is db
-    assert FakeReportService.instances[0].calls == [("export_pdf", "case-123")]
+    assert FakeReportService.instances[0].calls == [
+        ("export_pdf", "case-123", "user-123")
+    ]

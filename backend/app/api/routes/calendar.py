@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
+from app.integrations.google_calendar import GoogleCalendarClient
 
 router = APIRouter()
 
@@ -20,6 +21,8 @@ class ScheduleTaskRequest(BaseModel):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     time: str = Field(..., pattern=r"^\d{2}:\d{2}$")
     notes: str | None = None
+    accessToken: str | None = None
+    timeZone: str = "UTC"
 
     @field_validator("date")
     @classmethod
@@ -46,6 +49,14 @@ class ScheduleTaskResponse(BaseModel):
     status: str
     calendarEventId: str
     message: str
+
+
+class CalendarAuthCodeRequest(BaseModel):
+    code: str = Field(..., min_length=1)
+
+
+class CalendarTokenRequest(BaseModel):
+    accessToken: str = Field(..., min_length=1)
 
 
 def _uid(current_user: dict) -> str:
@@ -91,6 +102,68 @@ def _schedule_success(task_id: str, calendar_event_id: str) -> dict:
     }
 
 
+async def _create_calendar_event(
+    task_id: str,
+    payload: ScheduleTaskRequest,
+    scheduled_for: str,
+) -> str:
+    if not payload.accessToken:
+        return _mock_event_id(task_id)
+
+    task_data = {
+        "id": task_id,
+        "title": payload.title,
+        "description": payload.notes,
+        "scheduledFor": scheduled_for,
+        "timeZone": payload.timeZone,
+    }
+    try:
+        return await GoogleCalendarClient().create_event(payload.accessToken, task_data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Google Calendar event creation failed: {exc}",
+        )
+
+
+@router.get("/auth/url")
+async def get_calendar_auth_url(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the Google OAuth URL needed to connect Calendar."""
+    _uid(current_user)
+    try:
+        auth_url = await GoogleCalendarClient().get_auth_url()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    return {"authUrl": auth_url}
+
+
+@router.post("/auth/callback")
+async def exchange_calendar_code(
+    payload: CalendarAuthCodeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Exchange a Google OAuth code for Calendar tokens."""
+    _uid(current_user)
+    try:
+        token_data = await GoogleCalendarClient().exchange_code(payload.code)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Google Calendar token exchange failed: {exc}",
+        )
+    return token_data
+
+
 @router.post("/tasks/{task_id}/schedule", response_model=ScheduleTaskResponse)
 async def schedule_task(
     task_id: str,
@@ -98,14 +171,10 @@ async def schedule_task(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    """Schedule a task.
-
-    TODO: Replace the mock event creation with Google Calendar API calls once
-    OAuth, token storage, refresh handling, and calendar selection are available.
-    """
+    """Schedule a task locally, or in Google Calendar when an access token is supplied."""
     uid = _uid(current_user)
-    calendar_event_id = _mock_event_id(task_id)
     scheduled_for = f"{payload.date}T{payload.time}:00"
+    calendar_event_id = await _create_calendar_event(task_id, payload, scheduled_for)
 
     try:
         if db is None:
@@ -138,6 +207,7 @@ async def schedule_task(
                 "scheduledFor": scheduled_for,
                 "scheduleTitle": payload.title,
                 "scheduleNotes": payload.notes,
+                "scheduleTimeZone": payload.timeZone,
                 "updatedAt": _utc_now(),
             }
         )
@@ -149,4 +219,21 @@ async def schedule_task(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected calendar scheduling failure",
+        )
+
+
+@router.delete("/events/{event_id}")
+async def delete_calendar_event(
+    event_id: str,
+    payload: CalendarTokenRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a Google Calendar event."""
+    _uid(current_user)
+    try:
+        return await GoogleCalendarClient().delete_event(payload.accessToken, event_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Google Calendar event deletion failed: {exc}",
         )

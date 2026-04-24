@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 import re
 from typing import Any
+from uuid import uuid4
 
 from fastapi import HTTPException, status
 from google.cloud.firestore_v1 import Query
@@ -23,6 +24,9 @@ from app.models.extracted_fact import ExtractedFact
 from app.models.investigation_task import InvestigationTask
 from app.models.recommendation import Recommendation
 from app.models.report_export import ReportExport
+from app.services.mvp_store import store
+
+_DB_CLIENT_UNSET = object()
 
 # What is report_service.py for?
 # The report_service.py file defines a service class, ReportService, that contains the core business logic for generating comprehensive business reports and exporting them as PDFs in our application. This includes functions for retrieving the latest report and recommendation for a specific business case, compiling all available evidence (such as facts, tasks, and uploaded files) into a detailed report, and generating a PDF version of the report for users to download. By centralizing this logic in a service class, we can keep our API route handlers clean and focused on handling HTTP requests and responses, while the ReportService takes care of the underlying mechanics of report generation and export. This separation of concerns allows us to maintain a clear structure in our codebase and makes it easier to manage and update our reporting logic as needed.
@@ -30,15 +34,18 @@ from app.models.report_export import ReportExport
 class ReportService:
     """Service for report generation and export."""
 
+    _fallback_recommendations: dict[tuple[str, str], list[dict]] = {}
+    _fallback_exports: dict[tuple[str, str], list[dict]] = {}
+
     def __init__(
         self,
-        db_client: Any | None = None,
+        db_client: Any = _DB_CLIENT_UNSET,
         storage_client: Any | None = None,
     ):
-        self.db = db_client if db_client is not None else default_db
+        self.db = default_db if db_client is _DB_CLIENT_UNSET else db_client
         self.storage_client = storage_client
 
-    async def get_latest_report(self, case_id: str):
+    async def get_latest_report(self, case_id: str, user_id: str | None = None):
         """Get the latest recommendation and report for a case."""
         case_id = (case_id or "").strip()
         if not case_id:
@@ -46,23 +53,11 @@ class ReportService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Case ID is required",
             )
+        if self.db is None and user_id:
+            return self._fallback_get_latest_report(user_id, case_id)
         self._require_firestore()
 
-        case_ref = self.db.collection(BusinessCase.COLLECTION).document(case_id)
-        try:
-            if not case_ref.get().exists:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Business case not found",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Failed to verify business case: {exc}",
-            )
-
+        case_ref = self._get_existing_case_ref(case_id, user_id=user_id)
         recommendation_doc = self._latest_document(
             case_ref.collection(Recommendation.SUBCOLLECTION),
             order_field="created_at",
@@ -86,7 +81,7 @@ class ReportService:
             "export": self._serialize_export(latest_export) if latest_export else None,
         }
 
-    async def generate_full_report(self, case_id: str):
+    async def generate_full_report(self, case_id: str, user_id: str | None = None):
         """Compile all evidence into a comprehensive business report."""
         case_id = (case_id or "").strip()
         if not case_id:
@@ -94,16 +89,13 @@ class ReportService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Case ID is required",
             )
+        if self.db is None and user_id:
+            return self._fallback_generate_full_report(user_id, case_id)
         self._require_firestore()
 
-        case_ref = self.db.collection(BusinessCase.COLLECTION).document(case_id)
+        case_ref = self._get_existing_case_ref(case_id, user_id=user_id)
         try:
             case_snapshot = case_ref.get()
-            if not case_snapshot.exists:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Business case not found",
-                )
         except HTTPException:
             raise
         except Exception as exc:
@@ -209,7 +201,7 @@ class ReportService:
             "context": report_context,
         }
 
-    async def export_pdf(self, case_id: str):
+    async def export_pdf(self, case_id: str, user_id: str | None = None):
         """Generate and return a PDF version of the report."""
         case_id = (case_id or "").strip()
         if not case_id:
@@ -219,20 +211,42 @@ class ReportService:
             )
 
         try:
-            report_data = await self.get_latest_report(case_id)
+            report_data = await self.get_latest_report(case_id, user_id=user_id)
         except HTTPException as exc:
             if exc.status_code != status.HTTP_404_NOT_FOUND:
                 raise
-            report_data = await self.generate_full_report(case_id)
+            report_data = await self.generate_full_report(case_id, user_id=user_id)
 
         if not report_data.get("report"):
-            report_data = await self.generate_full_report(case_id)
+            report_data = await self.generate_full_report(case_id, user_id=user_id)
 
         pdf_bytes = self._render_pdf(report_data)
         now = datetime.now(timezone.utc)
         file_name = self._build_pdf_file_name(case_id, now)
         storage_path = f"reports/{case_id}/{file_name}"
         download_url = None
+
+        if self.db is None and user_id:
+            report_export = {
+                "id": f"report_exports-{uuid4().hex}",
+                "case_id": case_id,
+                "file_name": file_name,
+                "storage_path": None,
+                "download_url": None,
+                "file_size": len(pdf_bytes),
+                "format": "pdf",
+                "created_at": now,
+            }
+            self._fallback_exports.setdefault((user_id, case_id), []).append(
+                report_export
+            )
+            return {
+                "case_id": case_id,
+                "file_name": file_name,
+                "content_type": "application/pdf",
+                "pdf_bytes": pdf_bytes,
+                "export": report_export,
+            }
 
         if self.storage_client is not None:
             try:
@@ -281,6 +295,145 @@ class ReportService:
                 detail="Firestore is not configured",
             )
 
+    def _get_existing_case_ref(self, case_id: str, user_id: str | None = None):
+        refs = []
+        if user_id:
+            refs.append(
+                self.db.collection("users")
+                .document(user_id)
+                .collection("cases")
+                .document(case_id)
+            )
+        refs.append(self.db.collection(BusinessCase.COLLECTION).document(case_id))
+
+        try:
+            for case_ref in refs:
+                if case_ref.get().exists:
+                    return case_ref
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business case not found",
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Failed to load business case: {exc}",
+            )
+
+    def _fallback_get_latest_report(self, user_id: str, case_id: str):
+        self._require_fallback_case(user_id, case_id)
+        recommendations = self._fallback_recommendations.get((user_id, case_id), [])
+        if not recommendations:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No report has been generated for this case",
+            )
+        latest = recommendations[-1]
+        exports = self._fallback_exports.get((user_id, case_id), [])
+        return {
+            "case_id": case_id,
+            "recommendation": latest,
+            "report": latest.get("full_report"),
+            "export": exports[-1] if exports else None,
+        }
+
+    def _fallback_generate_full_report(self, user_id: str, case_id: str):
+        case = self._require_fallback_case(user_id, case_id)
+        tasks = store.list_tasks(user_id, case_id)
+        uploads = store.list_uploads(user_id, case_id)
+        context = {
+            "case": {
+                "id": case["id"],
+                "user_id": user_id,
+                "title": case["title"],
+                "description": case.get("description"),
+                "mode": case.get("businessStage") or "pre_launch",
+                "business_type": None,
+                "target_location": None,
+                "status": case["status"],
+                "created_at": case["createdAt"],
+                "updated_at": case["updatedAt"],
+            },
+            "facts": [],
+            "uploads": [
+                {
+                    "id": upload["id"],
+                    "case_id": case_id,
+                    "file_name": upload["fileName"],
+                    "file_type": upload.get("fileType"),
+                    "file_size": upload.get("fileSize"),
+                    "storage_path": None,
+                    "download_url": upload.get("url"),
+                    "ai_summary": None,
+                    "analysis_status": "uploaded",
+                    "created_at": upload["createdAt"],
+                }
+                for upload in uploads
+            ],
+            "places": [],
+            "tasks": [
+                {
+                    "id": task["id"],
+                    "recommendation_id": "",
+                    "title": task["title"],
+                    "description": task.get("description"),
+                    "location": None,
+                    "priority": "medium",
+                    "status": task["status"],
+                    "findings": None,
+                    "calendar_event_id": None,
+                    "due_date": None,
+                    "completed_at": None,
+                    "created_at": task["createdAt"],
+                }
+                for task in tasks
+            ],
+            "latest_recommendation": None,
+        }
+        full_report = self._build_full_report(context)
+        recommendations = self._fallback_recommendations.setdefault(
+            (user_id, case_id),
+            [],
+        )
+        now = datetime.now(timezone.utc)
+        recommendation = {
+            "id": f"recommendations-{uuid4().hex}",
+            "case_id": case_id,
+            "verdict": None,
+            "confidence_score": None,
+            "summary": (
+                f"Generated report for {case['title']} using "
+                f"{len(uploads)} uploads and {len(tasks)} tasks."
+            ),
+            "strengths": ["Initial report created for the business case."],
+            "weaknesses": [],
+            "action_items": [
+                "Review the generated report and decide whether more evidence is needed."
+            ],
+            "full_report": full_report,
+            "is_provisional": True,
+            "version": len(recommendations) + 1,
+            "created_at": now,
+        }
+        recommendations.append(recommendation)
+        return {
+            "case_id": case_id,
+            "recommendation": recommendation,
+            "report": full_report,
+            "context": context,
+        }
+
+    def _require_fallback_case(self, user_id: str, case_id: str) -> dict:
+        case = store.get_case(user_id, case_id)
+        if case is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Business case not found",
+            )
+        return case
+
     def _latest_report_export(self, case_id: str) -> ReportExport | None:
         query = self.db.collection(ReportExport.COLLECTION).where(
             "case_id",
@@ -316,12 +469,19 @@ class ReportService:
         ]
 
     def _load_evidence_uploads(self, case_ref: Any) -> list[EvidenceUpload]:
+        documents = self._documents(
+            case_ref.collection(EvidenceUpload.SUBCOLLECTION),
+            order_field="created_at",
+        )
+        documents.extend(
+            self._documents(
+                case_ref.collection("uploads"),
+                order_field="createdAt",
+            )
+        )
         return [
             EvidenceUpload.from_dict(doc.id, doc.to_dict() or {})
-            for doc in self._documents(
-                case_ref.collection(EvidenceUpload.SUBCOLLECTION),
-                order_field="created_at",
-            )
+            for doc in documents
         ]
 
     def _load_place_results(self, case_ref: Any) -> list[ApiPlaceResult]:
@@ -339,6 +499,14 @@ class ReportService:
         recommendation_docs: list,
     ) -> list[InvestigationTask]:
         tasks = []
+        direct_task_docs = self._documents(
+            case_ref.collection(InvestigationTask.SUBCOLLECTION),
+            order_field="createdAt",
+        )
+        tasks.extend(
+            InvestigationTask.from_dict(doc.id, doc.to_dict() or {})
+            for doc in direct_task_docs
+        )
         for recommendation_doc in recommendation_docs:
             task_docs = self._documents(
                 case_ref.collection(Recommendation.SUBCOLLECTION)

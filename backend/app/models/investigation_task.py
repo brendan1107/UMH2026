@@ -46,17 +46,22 @@ class InvestigationTask:
     def from_dict(doc_id: str, data: dict) -> "InvestigationTask":
         return InvestigationTask(
             id=doc_id,
-            recommendation_id=data.get("recommendation_id", ""),
+            recommendation_id=data.get("recommendation_id")
+            or data.get("recommendationId")
+            or "",
             title=data.get("title", ""),
             description=data.get("description"),
             location=data.get("location"),
             priority=data.get("priority", "medium"),
             status=data.get("status", "pending"),
             findings=data.get("findings"),
-            calendar_event_id=data.get("calendar_event_id"),
-            due_date=data.get("due_date"),
-            completed_at=data.get("completed_at"),
-            created_at=data.get("created_at", datetime.utcnow()),
+            calendar_event_id=data.get("calendar_event_id")
+            or data.get("calendarEventId"),
+            due_date=data.get("due_date") or data.get("dueDate"),
+            completed_at=data.get("completed_at") or data.get("completedAt"),
+            created_at=data.get("created_at")
+            or data.get("createdAt")
+            or datetime.utcnow(),
         )
 
     SUBCOLLECTION = "tasks"

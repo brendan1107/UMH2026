@@ -26,24 +26,37 @@ Handles the iterative AI conversation flow.
 from fastapi import APIRouter, Depends
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
 from app.schemas.chat import MessageCreate
 from app.services.chat_service import ChatService
 
 router = APIRouter()
 
 
+def _uid(current_user: dict) -> str:
+    return current_user["uid"]
+
+
 @router.post("/{case_id}/sessions")
-async def create_session(case_id: str, db=Depends(get_db)):
+async def create_session(
+    case_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Start a new chat session for a business case."""
     chat_service = ChatService(db_client=db)
-    return await chat_service.create_session(case_id)
+    return await chat_service.create_session(case_id, user_id=_uid(current_user))
 
 
 @router.get("/{case_id}/sessions")
-async def list_sessions(case_id: str, db=Depends(get_db)):
+async def list_sessions(
+    case_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """List all chat sessions for a business case."""
     chat_service = ChatService(db_client=db)
-    return await chat_service.list_sessions(case_id)
+    return await chat_service.list_sessions(case_id, user_id=_uid(current_user))
 
 
 @router.post("/{case_id}/sessions/{session_id}/messages")
@@ -52,6 +65,7 @@ async def send_message(
     session_id: str,
     payload: MessageCreate,
     db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Send a user message and receive AI response.
@@ -69,11 +83,21 @@ async def send_message(
         case_id=case_id,
         session_id=session_id,
         content=payload.content,
+        user_id=_uid(current_user),
     )
 
 
 @router.get("/{case_id}/sessions/{session_id}/messages")
-async def get_messages(case_id: str, session_id: str, db=Depends(get_db)):
+async def get_messages(
+    case_id: str,
+    session_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Retrieve message history for a session."""
     chat_service = ChatService(db_client=db)
-    return await chat_service.get_session_history(case_id, session_id)
+    return await chat_service.get_session_history(
+        case_id,
+        session_id,
+        user_id=_uid(current_user),
+    )

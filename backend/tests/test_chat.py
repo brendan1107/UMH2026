@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.routes import chat as chat_routes
+from app.ai.response_parser import ResponseParser
 from app.services.chat_service import ChatService
 
 
@@ -111,16 +112,22 @@ class FakeChatService:
         self.calls = []
         self.__class__.instances.append(self)
 
-    async def create_session(self, case_id: str):
-        self.calls.append(("create_session", case_id))
+    async def create_session(self, case_id: str, user_id: str | None = None):
+        self.calls.append(("create_session", case_id, user_id))
         return {"id": "session-123", "case_id": case_id}
 
-    async def list_sessions(self, case_id: str):
-        self.calls.append(("list_sessions", case_id))
+    async def list_sessions(self, case_id: str, user_id: str | None = None):
+        self.calls.append(("list_sessions", case_id, user_id))
         return [{"id": "session-123", "case_id": case_id}]
 
-    async def process_message(self, case_id: str, session_id: str, content: str):
-        self.calls.append(("process_message", case_id, session_id, content))
+    async def process_message(
+        self,
+        case_id: str,
+        session_id: str,
+        content: str,
+        user_id: str | None = None,
+    ):
+        self.calls.append(("process_message", case_id, session_id, content, user_id))
         return {
             "message": "AI response",
             "assistant_message": {
@@ -131,8 +138,13 @@ class FakeChatService:
             },
         }
 
-    async def get_session_history(self, case_id: str, session_id: str):
-        self.calls.append(("get_session_history", case_id, session_id))
+    async def get_session_history(
+        self,
+        case_id: str,
+        session_id: str,
+        user_id: str | None = None,
+    ):
+        self.calls.append(("get_session_history", case_id, session_id, user_id))
         return [
             {
                 "id": "message-1",
@@ -150,6 +162,9 @@ def build_chat_test_client(monkeypatch, db):
     app = FastAPI()
     app.include_router(chat_routes.router, prefix="/api/chat")
     app.dependency_overrides[chat_routes.get_db] = lambda: db
+    app.dependency_overrides[chat_routes.get_current_user] = lambda: {
+        "uid": "user-123"
+    }
     return TestClient(app)
 
 
@@ -325,7 +340,9 @@ def test_create_session_endpoint_calls_chat_service(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"id": "session-123", "case_id": "case-123"}
     assert FakeChatService.instances[0].db_client is db
-    assert FakeChatService.instances[0].calls == [("create_session", "case-123")]
+    assert FakeChatService.instances[0].calls == [
+        ("create_session", "case-123", "user-123")
+    ]
 
 
 def test_list_sessions_endpoint_calls_chat_service(monkeypatch):
@@ -337,7 +354,9 @@ def test_list_sessions_endpoint_calls_chat_service(monkeypatch):
     assert response.status_code == 200
     assert response.json() == [{"id": "session-123", "case_id": "case-123"}]
     assert FakeChatService.instances[0].db_client is db
-    assert FakeChatService.instances[0].calls == [("list_sessions", "case-123")]
+    assert FakeChatService.instances[0].calls == [
+        ("list_sessions", "case-123", "user-123")
+    ]
 
 
 def test_send_message_endpoint_calls_chat_service(monkeypatch):
@@ -353,7 +372,7 @@ def test_send_message_endpoint_calls_chat_service(monkeypatch):
     assert response.json()["message"] == "AI response"
     assert FakeChatService.instances[0].db_client is db
     assert FakeChatService.instances[0].calls == [
-        ("process_message", "case-123", "session-123", "Hello")
+        ("process_message", "case-123", "session-123", "Hello", "user-123")
     ]
 
 
@@ -374,9 +393,28 @@ def test_get_messages_endpoint_calls_chat_service(monkeypatch):
     ]
     assert FakeChatService.instances[0].db_client is db
     assert FakeChatService.instances[0].calls == [
-        ("get_session_history", "case-123", "session-123")
+        ("get_session_history", "case-123", "session-123", "user-123")
     ]
 
 
 def test_ai_response_parsing():
-    pass
+    parser = ResponseParser()
+    parsed = parser.parse_ai_response(
+        """
+        ```json
+        {
+          "message": "Collect rent and weekday footfall evidence.",
+          "facts": [{"key": "target_area", "value": "Kuala Lumpur"}],
+          "tasks": [{"title": "Check nearby competitors"}],
+          "recommendation": {"verdict": "reconsider", "confidence": 0.6}
+        }
+        ```
+        """
+    )
+
+    assert parsed["message"].startswith("Collect rent")
+    assert parser.extract_facts(parsed) == [
+        {"key": "target_area", "value": "Kuala Lumpur"}
+    ]
+    assert parser.extract_tasks(parsed) == [{"title": "Check nearby competitors"}]
+    assert parser.extract_recommendation(parsed)["verdict"] == "reconsider"

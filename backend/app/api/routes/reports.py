@@ -31,30 +31,47 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
 from app.services.report_service import ReportService
 
 router = APIRouter()
 
 
+def _uid(current_user: dict) -> str:
+    return current_user["uid"]
+
+
 @router.get("/{case_id}/report")
-async def get_report(case_id: str, db=Depends(get_db)):
+async def get_report(
+    case_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Get the current business report and recommendation for a case."""
     report_service = ReportService(db_client=db)
-    return await report_service.get_latest_report(case_id)
+    return await report_service.get_latest_report(case_id, user_id=_uid(current_user))
 
 
 @router.post("/{case_id}/report/generate")
-async def generate_report(case_id: str, db=Depends(get_db)):
+async def generate_report(
+    case_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Trigger a full report generation based on all available evidence."""
     report_service = ReportService(db_client=db)
-    return await report_service.generate_full_report(case_id)
+    return await report_service.generate_full_report(case_id, user_id=_uid(current_user))
 
 
 @router.get("/{case_id}/report/pdf")
-async def export_report_pdf(case_id: str, db=Depends(get_db)):
+async def export_report_pdf(
+    case_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Export the business report as a downloadable PDF."""
     report_service = ReportService(db_client=db)
-    export_result = await report_service.export_pdf(case_id)
+    export_result = await report_service.export_pdf(case_id, user_id=_uid(current_user))
     pdf_bytes = export_result["pdf_bytes"]
     file_name = str(export_result.get("file_name") or f"report-{case_id}.pdf").replace(
         '"',

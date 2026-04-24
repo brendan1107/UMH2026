@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, calendar, cases, tasks, uploads
+from app.api.routes import auth, calendar, cases, chat, reports, tasks, uploads
 from app.config import settings
 from app.db.database import bucket, db, firebase_initialization_error
 
@@ -25,6 +25,8 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(cases.router, prefix="/api/cases", tags=["Cases"])
+    app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+    app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
     app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
     app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
     app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])

@@ -4,6 +4,8 @@ Input Validators
 Common validation utilities for user inputs.
 """
 
+import re
+
 #Why this validators.py file does not have a class like other utils file?
 # The validators.py file is designed to contain standalone utility functions for validating user inputs, such as email formats and file types. Since these functions are simple and do not require maintaining any state or complex interactions, we can define them as independent functions rather than encapsulating them within a class. This approach keeps the code straightforward and easy to use, as we can directly call these validation functions without needing to instantiate a class. In contrast, other utility files like file_processor.py and pdf_generator.py contain classes because they may need to maintain state or have multiple related methods that logically belong together, making a class structure more appropriate for those cases.
 
@@ -12,8 +14,14 @@ Common validation utilities for user inputs.
 
 def validate_email(email: str) -> bool:
     """Validate email format."""
-    # TODO: Implement email validation
-    pass
+    if not email:
+        return False
+    return bool(
+        re.fullmatch(
+            r"[^@\s]+@[^@\s]+\.[^@\s]+",
+            email.strip(),
+        )
+    )
 
 
 def validate_file_type(content_type: str, allowed_types: list) -> bool:

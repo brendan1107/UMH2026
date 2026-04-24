@@ -1,17 +1,84 @@
-"""
-PDF Report Generator
+"""PDF report generation helpers."""
 
-Generates downloadable PDF reports from business analysis data.
-(SAD Section 8 step 14: PDF export option)
-"""
+from html import escape
+from pathlib import Path
+from typing import Any
 
-# What is pdf_generator.py for?
-# The pdf_generator.py file defines a PDFGenerator class that contains the logic for generating PDF reports based on the business analysis data compiled in our application. This class can include functions for taking the report data (such as the latest recommendation, case details, and evidence summaries) and formatting it into a professional PDF document that users can download. By centralizing this PDF generation logic in a utility class, we can keep our service classes focused on their core business logic while delegating the specifics of PDF creation to the PDFGenerator. This allows us to maintain a clear structure in our codebase and makes it easier to manage and update our PDF generation logic as needed, especially if we decide to use a specific library like reportlab or weasyprint for creating the PDFs.
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+
 
 class PDFGenerator:
-    """Generates PDF business reports."""
+    """Generate a downloadable business report PDF."""
 
     def generate(self, report_data: dict, output_path: str) -> str:
-        """Generate a PDF report and return the file path."""
-        # TODO: Use a library like reportlab or weasyprint
-        pass
+        """Generate a PDF report and return the output path."""
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        doc = SimpleDocTemplate(
+            str(path),
+            pagesize=letter,
+            title="F&B Genie Business Report",
+            leftMargin=48,
+            rightMargin=48,
+            topMargin=48,
+            bottomMargin=48,
+        )
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph("F&B Genie Business Report", styles["Title"]),
+            Spacer(1, 12),
+        ]
+
+        self._append_section(story, styles, "Case", report_data.get("case"))
+        self._append_section(story, styles, "Recommendation", report_data.get("recommendation"))
+        self._append_section(story, styles, "Facts", report_data.get("facts"))
+        self._append_section(story, styles, "Evidence", report_data.get("evidence"))
+        self._append_section(story, styles, "Tasks", report_data.get("tasks"))
+
+        doc.build(story)
+        return str(path)
+
+    def _append_section(self, story: list, styles: dict, title: str, value: Any) -> None:
+        story.append(Paragraph(escape(title), styles["Heading2"]))
+        for line in self._format_value(value):
+            story.append(Paragraph(escape(line), styles["BodyText"]))
+        story.append(Spacer(1, 10))
+
+    def _format_value(self, value: Any) -> list[str]:
+        if value is None:
+            return ["No data available."]
+        if isinstance(value, dict):
+            return [
+                f"{self._label(key)}: {self._scalar_text(item)}"
+                for key, item in value.items()
+                if item not in (None, "", [], {})
+            ] or ["No data available."]
+        if isinstance(value, list):
+            if not value:
+                return ["No data available."]
+            lines = []
+            for index, item in enumerate(value, start=1):
+                if isinstance(item, dict):
+                    summary = "; ".join(
+                        f"{self._label(key)}: {self._scalar_text(data)}"
+                        for key, data in item.items()
+                        if data not in (None, "", [], {})
+                    )
+                    lines.append(f"{index}. {summary or 'No details'}")
+                else:
+                    lines.append(f"{index}. {self._scalar_text(item)}")
+            return lines
+        return [self._scalar_text(value)]
+
+    @staticmethod
+    def _label(value: str) -> str:
+        return str(value).replace("_", " ").replace("-", " ").title()
+
+    @staticmethod
+    def _scalar_text(value: Any) -> str:
+        if isinstance(value, (dict, list)):
+            return str(value)
+        return str(value)

@@ -25,10 +25,23 @@ class ContextBuilder:
         - Generated tasks and their status
         - Prior recommendation state
         """
-        # TODO: Query all relevant data and build context dict
-        pass
+        return {
+            "case_id": case_id,
+            "facts": [],
+            "uploads": [],
+            "places": [],
+            "tasks": [],
+            "recommendation": None,
+            "conversation_summary": None,
+        }
 
     def truncate_context(self, context: dict, max_tokens: int) -> dict:
         """Truncate context to fit within GLM's token limit."""
-        # TODO: Prioritize decision-relevant data, summarize older turns
-        pass
+        if max_tokens <= 0:
+            return {}
+        truncated = dict(context)
+        for key in ("facts", "uploads", "places", "tasks"):
+            value = truncated.get(key)
+            if isinstance(value, list):
+                truncated[key] = value[-25:]
+        return truncated

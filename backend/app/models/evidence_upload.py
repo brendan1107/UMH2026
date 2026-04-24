@@ -43,15 +43,19 @@ class EvidenceUpload:
     def from_dict(doc_id: str, data: dict) -> "EvidenceUpload":
         return EvidenceUpload(
             id=doc_id,
-            case_id=data.get("case_id", ""),
-            file_name=data.get("file_name", ""),
-            file_type=data.get("file_type"),
-            file_size=data.get("file_size"),
-            storage_path=data.get("storage_path"),
-            download_url=data.get("download_url"),
-            ai_summary=data.get("ai_summary"),
-            analysis_status=data.get("analysis_status", "pending"),
-            created_at=data.get("created_at", datetime.utcnow()),
+            case_id=data.get("case_id") or data.get("caseId", ""),
+            file_name=data.get("file_name") or data.get("fileName", ""),
+            file_type=data.get("file_type") or data.get("fileType"),
+            file_size=data.get("file_size") or data.get("fileSize"),
+            storage_path=data.get("storage_path") or data.get("storagePath"),
+            download_url=data.get("download_url") or data.get("url"),
+            ai_summary=data.get("ai_summary") or data.get("aiSummary"),
+            analysis_status=data.get("analysis_status")
+            or data.get("analysisStatus")
+            or "pending",
+            created_at=data.get("created_at")
+            or data.get("createdAt")
+            or datetime.utcnow(),
         )
 
     SUBCOLLECTION = "evidence_uploads"

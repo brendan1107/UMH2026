@@ -17,6 +17,8 @@ from app.config import settings
 from app.db.database import db as default_db
 from app.models.user import User
 
+_DB_CLIENT_UNSET = object()
+
 # What is auth_service.py for?
 # The auth_service.py file defines a service class, AuthService, that contains the core logic for handling user authentication operations in our application. This includes functions for registering new users, authenticating existing users, hashing passwords securely, and generating JWT tokens for authenticated sessions. By centralizing this logic in a service class, we can keep our API route handlers clean and focused on handling HTTP requests and responses, while the AuthService takes care of the underlying authentication mechanics. This separation of concerns allows us to maintain a clear structure in our codebase and makes it easier to manage and update our authentication logic as needed.
 
@@ -33,7 +35,7 @@ class AuthService:
 
     def __init__(
         self,
-        db_client: Any | None = None,
+        db_client: Any = _DB_CLIENT_UNSET,
         auth_provider: Any | None = None,
         identity_toolkit_api_key: str | None = None,
         http_client_factory: Any | None = None,
@@ -41,7 +43,7 @@ class AuthService:
         jwt_algorithm: str | None = None,
         access_token_expire_minutes: int | None = None,
     ):
-        self.db = db_client if db_client is not None else default_db
+        self.db = default_db if db_client is _DB_CLIENT_UNSET else db_client
         self.auth = auth_provider if auth_provider is not None else firebase_auth
         self.identity_toolkit_api_key = identity_toolkit_api_key
         self.http_client_factory = http_client_factory or httpx.AsyncClient
