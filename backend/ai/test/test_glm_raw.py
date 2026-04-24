@@ -6,13 +6,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ZAI_KEY  = os.getenv("ZAI_API_KEY")
-ZAI_BASE = "https://open.bigmodel.cn/api/paas/v4"
-
+ZAI_BASE = "https://api.ilmu.ai/v1"
 def test_glm_connection():
     print("── Test 1: Basic connectivity ──")
 
     payload = {
-        "model": "glm-4",
+        "model": "ilmu-glm-5.1",
         "messages": [
             {"role": "user", "content": "Reply with exactly this JSON: {\"status\": \"alive\"}"}
         ],

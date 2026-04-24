@@ -48,7 +48,7 @@ def call_glm(system: str, user: str) -> str:
         f"{ZAI_BASE}/chat/completions",
         headers={"Authorization": f"Bearer {ZAI_KEY}"},
         json={
-            "model": "glm-4",
+            "model": "ilmu-glm-5.1",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user",   "content": user},
