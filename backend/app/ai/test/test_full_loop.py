@@ -95,6 +95,24 @@ async def simulate_full_case():
                     "role": "user",
                     "content": f"Answer: {output.options[0]}"
                 })
+            
+            elif output.type == "field_task":
+                print(f"   Task emitted    : {output.title}")
+                print(f"   Evidence needed : {output.evidence_type}")
+                print(f"   [Simulating user submitting evidence...]")
+                # Inject ALL missing required facts at once
+                case.fact_sheet["competitor_count"] = 6
+                case.fact_sheet["avg_competitor_rating"] = 4.1
+                case.fact_sheet["estimated_footfall_lunch"] = 90
+                case.fact_sheet["confirmed_rent_myr"] = 3200
+                case.fact_sheet["break_even_covers"] = 87
+                case.messages.append({
+                    "role": "user",
+                    "content": json.dumps({
+                        "task_completed": output.title,
+                        "submitted_facts": case.fact_sheet,
+                    })
+            })
 
             print()
 
