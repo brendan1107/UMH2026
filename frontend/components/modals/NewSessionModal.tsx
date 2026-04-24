@@ -11,6 +11,7 @@ interface NewSessionModalProps {
 
 export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProps) {
   const [description, setDescription] = useState("");
+  const [sessionType, setSessionType] = useState<"new" | "existing">("new");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   
@@ -34,7 +35,7 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
       setIsSuccess(true);
       // Wait for success animation then navigate
       setTimeout(() => {
-        router.push("/case/demo-session");
+        router.push(`/case/demo-session?type=${sessionType}`);
       }, 1000);
     }, 800);
   };
@@ -89,13 +90,61 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
 
                   <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-6">
                     <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-3">
+                        Business Stage
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <label className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none ${sessionType === 'new' ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-300'}`}>
+                          <input 
+                            type="radio" 
+                            name="sessionType" 
+                            value="new" 
+                            className="sr-only"
+                            checked={sessionType === 'new'}
+                            onChange={() => setSessionType('new')}
+                            disabled={isSubmitting}
+                          />
+                          <span className="flex flex-1">
+                            <span className="flex flex-col">
+                              <span className="block text-sm font-medium text-slate-900">New Business</span>
+                              <span className="mt-1 flex items-center text-xs text-slate-500">Just starting out or validating an idea.</span>
+                            </span>
+                          </span>
+                          <svg className={`h-5 w-5 ${sessionType === 'new' ? 'text-slate-900' : 'hidden'}`} viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                          </svg>
+                        </label>
+                        <label className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none ${sessionType === 'existing' ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-300'}`}>
+                          <input 
+                            type="radio" 
+                            name="sessionType" 
+                            value="existing" 
+                            className="sr-only"
+                            checked={sessionType === 'existing'}
+                            onChange={() => setSessionType('existing')}
+                            disabled={isSubmitting}
+                          />
+                          <span className="flex flex-1">
+                            <span className="flex flex-col">
+                              <span className="block text-sm font-medium text-slate-900">Existing Business</span>
+                              <span className="mt-1 flex items-center text-xs text-slate-500">Currently operating, looking for improvements.</span>
+                            </span>
+                          </span>
+                          <svg className={`h-5 w-5 ${sessionType === 'existing' ? 'text-slate-900' : 'hidden'}`} viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                          </svg>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Initial Project Details
                       </label>
                       <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Describe your F&B business idea, location, target audience, and current challenges..."
+                        placeholder={sessionType === 'new' ? "Describe your F&B business idea, location, target audience, and current challenges..." : "Describe your current business performance, recent challenges, and areas where you need guidance..."}
                         className="w-full bg-white border border-slate-300 rounded-lg p-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-shadow resize-none h-32 text-sm"
                         required
                         disabled={isSubmitting}
