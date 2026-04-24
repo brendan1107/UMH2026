@@ -1,0 +1,12 @@
+{
+  // This settings.json file configure MCP server 
+  "mcpServers": {
+    "markitdown": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "markitdown-mcp-npx"
+      ]
+    }
+  }
+}
