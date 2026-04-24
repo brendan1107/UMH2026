@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
     FIREBASE_STORAGE_BUCKET: str = ""
+    FIREBASE_WEB_API_KEY: str = ""
 
 
     # --- AI Model (GLM) ---

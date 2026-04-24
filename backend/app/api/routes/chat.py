@@ -26,6 +26,8 @@ Handles the iterative AI conversation flow.
 from fastapi import APIRouter, Depends
 
 from app.db.session import get_db
+from app.schemas.chat import MessageCreate
+from app.services.chat_service import ChatService
 
 router = APIRouter()
 
@@ -33,19 +35,24 @@ router = APIRouter()
 @router.post("/{case_id}/sessions")
 async def create_session(case_id: str, db=Depends(get_db)):
     """Start a new chat session for a business case."""
-    # TODO: Create session, initialize AI context
-    pass
+    chat_service = ChatService(db_client=db)
+    return await chat_service.create_session(case_id)
 
 
 @router.get("/{case_id}/sessions")
 async def list_sessions(case_id: str, db=Depends(get_db)):
     """List all chat sessions for a business case."""
-    # TODO: Return sessions
-    pass
+    chat_service = ChatService(db_client=db)
+    return await chat_service.list_sessions(case_id)
 
 
 @router.post("/{case_id}/sessions/{session_id}/messages")
-async def send_message(case_id: str, session_id: str, db=Depends(get_db)):
+async def send_message(
+    case_id: str,
+    session_id: str,
+    payload: MessageCreate,
+    db=Depends(get_db),
+):
     """
     Send a user message and receive AI response.
 
@@ -57,12 +64,16 @@ async def send_message(case_id: str, session_id: str, db=Depends(get_db)):
     5. Store AI response and extracted data
     6. Return response to frontend
     """
-    # TODO: Implement full AI orchestration pipeline
-    pass
+    chat_service = ChatService(db_client=db)
+    return await chat_service.process_message(
+        case_id=case_id,
+        session_id=session_id,
+        content=payload.content,
+    )
 
 
 @router.get("/{case_id}/sessions/{session_id}/messages")
 async def get_messages(case_id: str, session_id: str, db=Depends(get_db)):
     """Retrieve message history for a session."""
-    # TODO: Return paginated messages
-    pass
+    chat_service = ChatService(db_client=db)
+    return await chat_service.get_session_history(case_id, session_id)

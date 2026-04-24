@@ -17,28 +17,43 @@ Handles user registration, login, and token management.
 # - /logout: Endpoint for logging out a user (this may involve token invalidation or session management).
 
 # For example when a user wants to create a new account, they would send a POST request to the /register endpoint with their registration details (like email and password). The register function would then handle the logic for creating the user in the database and returning a success response. When a user wants to log in, they would send a POST request to the /login endpoint with their credentials. The login function would verify the credentials, generate a JWT token if they are valid, and return that token to the user. Finally, when a user wants to log out, they would send a POST request to the /logout endpoint, and the logout function would handle any necessary cleanup, such as invalidating the user's session or token. These endpoints allow users to securely manage their authentication and access to the application.
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from app.db.session import get_db
+from app.schemas.user import UserLogin, UserRegister
+from app.services.auth_service import AuthService
 
 router = APIRouter()
 
-@router.post("/register")
-async def register(db=Depends(get_db)):
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(payload: UserRegister, db=Depends(get_db)):
     """Register a new user account."""
-    # TODO: Implement user registration
-    pass
+    auth_service = AuthService(db_client=db)
+    user = await auth_service.register_user(
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+    )
+    return {
+        "message": "User registered successfully",
+        "user": user,
+    }
 
 
 @router.post("/login")
-async def login(db=Depends(get_db)):
-    """Authenticate user and return JWT token."""
-    # TODO: Implement login with JWT
-    pass
+async def login(payload: UserLogin, db=Depends(get_db)):
+    """Authenticate user and return a Firebase ID token."""
+    auth_service = AuthService(db_client=db)
+    return await auth_service.authenticate_user(
+        email=payload.email,
+        password=payload.password,
+    )
 
 
 @router.post("/logout")
 async def logout():
     """Invalidate user session."""
-    # TODO: Implement logout
-    pass
+    return {
+        "message": "Logged out successfully",
+    }
