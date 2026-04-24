@@ -1,10 +1,18 @@
 # test_full_loop.py
 # Run with: python test_full_loop.py
-import asyncio, json, os
+import asyncio, json, os, sys
+from pathlib import Path
+
+# ── Fix 1: tell Python where 'app' lives ──
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+# test_full_loop.py → test/ → ai/ → app/ → backend/ ← Python looks here now
+
+# ── Fix 2: load .env from backend/ ──
 from dotenv import load_dotenv
+load_dotenv(dotenv_path=Path(__file__).parent.parent.parent.parent / ".env")
+
 from unittest.mock import AsyncMock, patch
 
-load_dotenv()
 
 # ── Mock tool results (no Google API needed for this test) ──
 MOCK_COMPETITORS = {
@@ -28,7 +36,8 @@ async def simulate_full_case():
     # Import your actual agent files
     from app.ai.schemas import BusinessCase
     from app.ai.orchestrator import run_agent_turn
-
+    from app.ai.schemas import BusinessCase, CompetitorResult, FootfallEstimate, BreakevenModel
+    
     # Start a fake case
     case = BusinessCase(
         id="test-001",

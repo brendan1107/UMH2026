@@ -20,7 +20,7 @@ async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
-            f"{ZAI_BASE}/chat/completions",
+            ZAI_BASE,
             headers={"Authorization": f"Bearer {ZAI_KEY}"},
             json={
                 "model": os.getenv("GLM_MODEL_NAME"),
