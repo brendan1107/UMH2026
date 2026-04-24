@@ -1,35 +1,50 @@
-"""
-FastAPI Dependency Injection
+"""FastAPI dependencies shared by the backend routes."""
 
-Provides shared dependencies such as Firestore client,
-authenticated user context, and service instances.
-"""
-
-# What is dependencies.py for?
-# The dependencies.py file in the app directory is responsible for defining shared dependencies that can be injected into our API route handlers using FastAPI's dependency injection system. This includes functions for accessing the Firestore client, retrieving the current authenticated user from the request context, and providing instances of our service classes (ReportService, TaskService, UploadService). By centralizing these dependencies in one file, we can easily manage and reuse them across our API routes, keeping our code organized and promoting a clear separation of concerns. This allows us to maintain clean and efficient API route handlers while delegating the underlying mechanics of database access and user authentication to these shared dependencies.
-
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 from firebase_admin import auth as firebase_auth
 
-from app.db.session import get_db
+from app.config import settings
+from app.db.database import firebase_app
 
 
-async def get_current_user(request: Request):
+def _local_demo_user(request: Request) -> dict:
+    uid = (
+        request.headers.get("X-Demo-User-Id")
+        or request.headers.get("X-User-Id")
+        or "demo-user"
+    )
+    return {"uid": uid, "authProvider": "local-demo"}
+
+
+async def get_current_user(request: Request) -> dict:
     """
-    Dependency to extract and validate the current authenticated user
-    using Firebase Auth ID token from the Authorization header.
+    Validate Firebase Auth when configured.
+
+    In development, missing Firebase auth falls back to a scoped demo user so the
+    backend can run without Firebase credentials or frontend auth wiring.
     """
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
+
+    if firebase_app is None:
+        return _local_demo_user(request)
+
+    if not auth_header:
+        if settings.DEBUG:
+            return _local_demo_user(request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid Authorization header",
+            detail="Missing Authorization header",
         )
 
-    token = auth_header.split("Bearer ")[1]
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header",
+        )
+
+    token = auth_header.removeprefix("Bearer ").strip()
     try:
-        decoded_token = firebase_auth.verify_id_token(token)
-        return decoded_token
+        return firebase_auth.verify_id_token(token)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

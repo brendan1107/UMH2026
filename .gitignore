@@ -13,6 +13,7 @@ backend/.venv/
 backend/.env
 backend/firebase-service-account.json
 __pycache__/
+backend/env.backend
 *.py[cod]
 *.egg-info/
 

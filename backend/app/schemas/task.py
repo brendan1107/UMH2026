@@ -1,27 +1,52 @@
-"""Investigation task schemas."""
+"""Investigation task request and response schemas."""
 
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+TaskStatus = Literal["pending", "completed", "skipped", "scheduled"]
+TaskType = Literal[
+    "answer_questions",
+    "choose_option",
+    "upload_file",
+    "upload_image",
+    "provide_text_input",
+    "review_ai_suggestions",
+    "analyze_competitors",
+]
+
+
+class TaskCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str | None = None
+    type: TaskType = "provide_text_input"
+    status: TaskStatus = "pending"
+    actionLabel: str | None = None
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    type: TaskType | None = None
+    status: TaskStatus | None = None
+    actionLabel: str | None = None
 
 
 class TaskResponse(BaseModel):
     id: str
+    caseId: str
     title: str
-    description: Optional[str]
-    location: Optional[str]
-    priority: str
-    status: str
-    due_date: Optional[datetime]
-
-    class Config:
-        from_attributes = True
+    description: str | None
+    type: TaskType
+    status: TaskStatus
+    actionLabel: str | None
+    createdAt: str
+    updatedAt: str
 
 
-class TaskComplete(BaseModel):
-    findings: str
+class TaskListEnvelope(BaseModel):
+    data: list[TaskResponse]
 
 
-class TaskSchedule(BaseModel):
-    scheduled_date: datetime
-    notes: Optional[str] = None
+class TaskEnvelope(BaseModel):
+    data: TaskResponse
