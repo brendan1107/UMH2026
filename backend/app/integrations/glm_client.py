@@ -5,6 +5,7 @@ Client for Z AI GLM model — the core reasoning engine (SAD Section 9).
 Handles API calls, retries, and fallback behavior (SAD Section 13).
 """
 
+import json
 import httpx
 from app.config import settings
 
@@ -19,13 +20,52 @@ class GLMClient:
         self.model = settings.GLM_MODEL_NAME
         self.max_tokens = settings.GLM_MAX_TOKENS
 
-    async def chat_completion(self, messages: list, temperature: float = 0.7) -> str:
-        """Send a chat completion request to GLM."""
-        # TODO: Implement API call with retry logic
-        # Fallback: retry once, then show graceful fallback message (SAD Section 13)
-        pass
+    async def chat_completion(
+        self,
+        messages: list[dict],
+        system: str,
+        temperature: float = 0.2,
+    ) -> str:
+        """Send a chat completion request and return raw content string."""
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                *messages,
+            ],
+            "temperature": temperature,
+            "max_tokens": self.max_tokens,
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json=payload,
+            )
+            resp.raise_for_status()
+
+        content = resp.json()["choices"][0]["message"]["content"]
+
+        # Strip markdown fences if model wraps in ```json
+        content = content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        return content.strip()
 
     async def health_check(self) -> bool:
         """Check if GLM API is available."""
-        # TODO: Ping API
-        pass
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"{self.base_url}/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+            return resp.status_code == 200
+        except Exception:
+            return False
+
+
+# Singleton — import this everywhere
+glm_client = GLMClient()

@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 load_dotenv()
 
-ZAI_KEY  = os.getenv("ZAI_API_KEY")
-ZAI_BASE = "https://api.ilmu.ai/v1"
+ZAI_BASE = os.getenv("GLM_API_BASE_URL")  # ZAI endpoint
+ZAI_KEY  = os.getenv("GLM_API_KEY")
 
 
 # ── Paste your actual schemas here for standalone testing ──

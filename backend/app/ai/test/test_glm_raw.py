@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ZAI_KEY  = os.getenv("ZAI_API_KEY")
-ZAI_BASE = "https://api.ilmu.ai/v1"
+ZAI_BASE = os.getenv("GLM_API_BASE_URL")  # ZAI endpoint
+ZAI_KEY  = os.getenv("GLM_API_KEY")
+
 def test_glm_connection():
     print("── Test 1: Basic connectivity ──")
 

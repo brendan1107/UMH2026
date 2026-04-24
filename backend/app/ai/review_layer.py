@@ -1,28 +1,43 @@
-"""
-Review Layer
+import json
+import os
 
-Secondary model-check step that reviews AI output for realism and grounding.
-Filters unrealistic or hallucinated business recommendations.
-(PRD Section 4.3.5, SAD Section 5 Model 2 / Review Prompt)
-"""
+import httpx
 
+from app.ai.prompts_templates import AUDITOR_PROMPT
+from app.ai.schemas import AuditResult, BusinessCase
 
-class ReviewLayer:
-    """Sanity-check layer for AI-generated recommendations."""
+ZAI_BASE = os.getenv("GLM_API_BASE_URL")  # ZAI endpoint
+ZAI_KEY  = os.getenv("GLM_API_KEY")
 
-    async def review_recommendation(self, recommendation: dict, context: dict) -> dict:
-        """
-        Review whether AI recommendation is realistic, grounded, and consistent.
+async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
+    user_content = json.dumps({
+        "business_plan_summary": plan_summary,
+        "fact_sheet": case.fact_sheet,
+        "verdict": case.phase,
+        "location": case.location,
+        "budget_myr": case.budget_myr,
+    })
 
-        Returns:
-        - accepted: recommendation is sound
-        - revised: recommendation needs adjustment (with suggestions)
-        - rejected: recommendation is unrealistic or hallucinated
-        """
-        # TODO: Send review prompt to GLM, parse review result
-        pass
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{ZAI_BASE}/chat/completions",
+            headers={"Authorization": f"Bearer {ZAI_KEY}"},
+            json={
+                "model": os.getenv("GLM_MODEL_NAME"),
+                "messages": [
+                    {"role": "system", "content": AUDITOR_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1000,
+            },
+        )
+        resp.raise_for_status()
 
-    async def validate_facts(self, facts: list) -> list:
-        """Validate extracted facts for consistency and plausibility."""
-        # TODO: Cross-check facts against known data
-        pass
+    content = resp.json()["choices"][0]["message"]["content"].strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    data = json.loads(content.strip())
+    return AuditResult(**data)

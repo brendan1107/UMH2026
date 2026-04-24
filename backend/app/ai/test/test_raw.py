@@ -2,10 +2,13 @@ import httpx, os, json
 from dotenv import load_dotenv
 load_dotenv()
 
-key = os.getenv("ZAI_API_KEY")
+  # ZAI endpoint
+ZAI_KEY  = os.getenv("GLM_API_KEY")
+ZAI_BASE = os.getenv("GLM_API_BASE_URL")
+
 resp = httpx.post(
-    "https://api.ilmu.ai/v1/chat/completions",
-    headers={"Authorization": f"Bearer {key}"},
+    ZAI_BASE,
+    headers={"Authorization": f"Bearer {ZAI_KEY}"},
     json={
         "model": "ilmu-glm-5.1",
         "messages": [

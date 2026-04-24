@@ -31,7 +31,7 @@ def next_phase(case: BusinessCase, output: AgentOutput) -> Phase:
 
     if current == "EVIDENCE":
         # Check if all required facts are now present
-        from app.ai.prompts import REQUIRED_FACTS
+        from app.ai.prompts_templates import REQUIRED_FACTS
         if all(k in case.fact_sheet for k in REQUIRED_FACTS):
             return "VERDICT"
         return "EVIDENCE"

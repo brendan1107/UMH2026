@@ -27,7 +27,7 @@ async def simulate_full_case():
 
     # Import your actual agent files
     from app.ai.schemas import BusinessCase
-    from app.ai.agent import run_agent_turn
+    from app.ai.orchestrator import run_agent_turn
 
     # Start a fake case
     case = BusinessCase(
