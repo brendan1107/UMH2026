@@ -20,7 +20,7 @@ async def glm_call(
             *messages,
         ],
         "temperature": 0.2,
-        "max_tokens": 000,
+        "max_tokens": 2000,
     }
 
     async with httpx.AsyncClient(timeout=60, http2=False) as client:
