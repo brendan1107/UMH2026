@@ -1,6 +1,6 @@
 #All system prompts
 
-# ai/prompts.py
+# app/ai/prompts.py
 import json
 
 # Required facts before verdict is allowed

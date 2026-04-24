@@ -1,12 +1,12 @@
 #core loop
 
-# ai/agent.py
+# app/ai/agent.py
 import json
-from ai.schemas import BusinessCase, AgentOutput
-from ai.glm_client import glm_call
-from ai.prompts import build_agent_prompt
-from ai.tools import TOOL_REGISTRY
-from ai.state import next_phase, apply_tool_result
+from app.ai.schemas import BusinessCase, AgentOutput
+from app.ai.glm_client import glm_call
+from app.ai.prompts import build_agent_prompt
+from app.ai.tools import TOOL_REGISTRY
+from app.ai.state import next_phase, apply_tool_result
 
 async def run_agent_turn(case: BusinessCase) -> tuple[BusinessCase, AgentOutput]:
     """

@@ -1,9 +1,9 @@
 # ZAI API wrapper
 
-# ai/glm_client.py
+# app/ai/glm_client.py
 import os, json
 import httpx
-from ai.schemas import AgentOutput
+from app.ai.schemas import AgentOutput
 
 ZAI_BASE = "https://open.bigmodel.cn/api/paas/v4"  # ZAI endpoint
 ZAI_KEY  = os.getenv("ZAI_API_KEY")
@@ -55,6 +55,6 @@ async def glm_call(
         "clarify":    "ClarifyOutput",
         "verdict":    "VerdictOutput",
     }
-    from ai import schemas
+    from app.ai import schemas
     model_cls = getattr(schemas, type_map[data["type"]])
     return model_cls(**data)

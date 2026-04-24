@@ -1,7 +1,7 @@
 #phase machine
 
-# ai/state.py
-from ai.schemas import BusinessCase, Phase, AgentOutput
+# app/ai/state.py
+from app.ai.schemas import BusinessCase, Phase, AgentOutput
 
 # What facts each tool call writes to fact_sheet
 TOOL_FACT_KEYS = {
@@ -31,7 +31,7 @@ def next_phase(case: BusinessCase, output: AgentOutput) -> Phase:
 
     if current == "EVIDENCE":
         # Check if all required facts are now present
-        from ai.prompts import REQUIRED_FACTS
+        from app.ai.prompts import REQUIRED_FACTS
         if all(k in case.fact_sheet for k in REQUIRED_FACTS):
             return "VERDICT"
         return "EVIDENCE"

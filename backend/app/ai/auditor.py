@@ -1,10 +1,10 @@
 # pass 2 critic
 
-# ai/auditor.py
+# app/ai/auditor.py
 import json
-from ai.glm_client import glm_call
-from ai.prompts import AUDITOR_PROMPT
-from ai.schemas import AuditResult, BusinessCase
+from app.ai.glm_client import glm_call
+from app.ai.prompts import AUDITOR_PROMPT
+from app.ai.schemas import AuditResult, BusinessCase
 
 async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
     """

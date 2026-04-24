@@ -1,10 +1,10 @@
 # PDF generation
 
-# ai/report.py
+# app/ai/report.py
 # pip install weasyprint jinja2
 from jinja2 import Template
 from weasyprint import HTML
-from ai.schemas import BusinessCase, AuditResult
+from app.ai.schemas import BusinessCase, AuditResult
 
 REPORT_TEMPLATE = """
 <!DOCTYPE html>

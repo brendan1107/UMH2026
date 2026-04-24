@@ -26,8 +26,8 @@ async def simulate_full_case():
     print("═══ FULL AGENT LOOP SIMULATION ═══\n")
 
     # Import your actual agent files
-    from ai.schemas import BusinessCase
-    from ai.agent import run_agent_turn
+    from app.ai.schemas import BusinessCase
+    from app.ai.agent import run_agent_turn
 
     # Start a fake case
     case = BusinessCase(
@@ -47,12 +47,12 @@ async def simulate_full_case():
     turn = 0
 
     # Patch tool calls so we don't hit Google API
-    with patch("ai.tools.fetch_competitors", new_callable=AsyncMock) as mock_comp, \
-         patch("ai.tools.estimate_footfall", new_callable=AsyncMock) as mock_foot, \
-         patch("ai.tools.calculate_breakeven", new_callable=AsyncMock) as mock_bev:
+    with patch("app.ai.tools.fetch_competitors", new_callable=AsyncMock) as mock_comp, \
+         patch("app.ai.tools.estimate_footfall", new_callable=AsyncMock) as mock_foot, \
+         patch("app.ai.tools.calculate_breakeven", new_callable=AsyncMock) as mock_bev:
 
         # Return mock data from tools
-        from ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
+        from app.ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
         mock_comp.return_value  = CompetitorResult(**MOCK_COMPETITORS)
         mock_foot.return_value  = FootfallEstimate(**MOCK_FOOTFALL)
         mock_bev.return_value   = BreakevenModel(**MOCK_BREAKEVEN)

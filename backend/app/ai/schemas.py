@@ -1,6 +1,6 @@
 # all pydantic models for ai agent
 
-# ai/schemas.py
+# app/ai/schemas.py
 from pydantic import BaseModel, UUID4
 from typing import Any, Literal, Optional
 from datetime import datetime

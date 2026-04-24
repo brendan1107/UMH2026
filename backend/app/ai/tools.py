@@ -1,8 +1,8 @@
 # Tool definitions
 
-# ai/tools.py
+# app/ai/tools.py
 import os, httpx
-from ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
+from app.ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
 
 PLACES_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 
