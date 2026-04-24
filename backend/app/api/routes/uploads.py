@@ -25,7 +25,6 @@ Files are stored in Supabase Storage and processed by the AI.
 # For example, when a user uploads a photo of a competitor's menu, the POST /api/cases/{case_id}/upload endpoint will be called to handle the file upload. The file will be validated and stored in Supabase Storage, and a new record will be created in the evidence_uploads table. The AI will then process the uploaded file to extract relevant information (e.g., menu items, prices) and update the business case analysis accordingly. Users can also view their uploaded evidence through the GET /api/cases/{case_id}/uploads endpoint and delete any unwanted uploads using the DELETE /api/uploads/{upload_id} endpoint. This functionality allows users to easily incorporate real-world evidence into their business investigations and see how it impacts the AI's recommendations.
 
 from fastapi import APIRouter, Depends, UploadFile, File
-from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
@@ -36,7 +35,7 @@ router = APIRouter()
 async def upload_evidence(
     case_id: str,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db=Depends(get_db),
 ):
     """
     Upload evidence file (photo, document, menu, etc.).
@@ -53,14 +52,14 @@ async def upload_evidence(
 
 
 @router.get("/{case_id}/uploads")
-async def list_uploads(case_id: str, db: Session = Depends(get_db)):
+async def list_uploads(case_id: str, db=Depends(get_db)):
     """List all evidence uploads for a business case."""
     # TODO: Return upload metadata
     pass
 
 
 @router.delete("/{upload_id}")
-async def delete_upload(upload_id: str, db: Session = Depends(get_db)):
+async def delete_upload(upload_id: str, db=Depends(get_db)):
     """Delete an evidence upload."""
     # TODO: Remove from storage and database
     pass

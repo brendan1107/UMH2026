@@ -21,14 +21,32 @@ Provides the Firestore client for use across the application.
 # uploads for evidence, we can use get_storage_bucket() to access the Firebase Storage
 #  bucket and manage our file uploads efficiently. This setup allows us to keep our 
 # database interactions clean and consistent across our application.
-from app.db.database import db, bucket
+from fastapi import HTTPException, status
+
+from app.db.database import bucket, db, firebase_initialization_error
 
 
 def get_db():
     """Return the Firestore client instance."""
+    if db is None:
+        detail = "Firebase is not configured"
+        if firebase_initialization_error is not None:
+            detail = str(firebase_initialization_error)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail,
+        )
     return db
 
 
 def get_storage_bucket():
     """Return the Firebase Storage bucket instance."""
+    if bucket is None:
+        detail = "Firebase Storage is not configured"
+        if firebase_initialization_error is not None:
+            detail = str(firebase_initialization_error)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail,
+        )
     return bucket

@@ -20,8 +20,8 @@ cp .env.example .env
 # Download from Firebase Console > Project Settings > Service Accounts
 # Save as firebase-service-account.json in the backend/ directory
 
-# Start development server
-uvicorn app.main:app --reload --port 8000
+# Start development server from the backend/ directory
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ## Project Structure

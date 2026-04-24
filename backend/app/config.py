@@ -8,6 +8,7 @@ for database, AI model, and external API configurations.
 # What is config.py for?
 # The config.py file is responsible for loading environment variables and providing a structured, typed configuration for our application. It defines a Settings class using Pydantic's BaseSettings, which allows us to easily manage and access our application's configuration settings throughout the codebase. This includes settings for Firebase, the GLM AI model, Google API keys, authentication parameters, and CORS allowed origins. By centralizing our configuration in this file, we can keep our code organized and make it easier to manage different environments (development, staging, production) by simply changing the environment variables without needing to modify the code. This approach promotes clean code and makes it easier to maintain and update our application's configuration as needed.
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -46,6 +47,14 @@ class Settings(BaseSettings):
 
     # --- CORS ---
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        """Accept common deployment labels from host-level DEBUG variables."""
+        if isinstance(value, str) and value.lower() == "release":
+            return False
+        return value
 
     class Config:
         env_file = ".env"

@@ -8,6 +8,20 @@ from app.ai.prompts import build_agent_prompt
 from app.ai.tools import TOOL_REGISTRY
 from app.ai.state import next_phase, apply_tool_result
 
+# How to run uvicorn command:
+# uvicorn app.main:app --reload
+
+# What is this command for?
+# The command `uvicorn app.main:app --reload` is used to start the FastAPI application defined in the `app/main.py` file. Uvicorn is an ASGI server that serves the FastAPI application, allowing it to handle incoming HTTP requests. The `--reload` flag enables auto-reloading of the server whenever code changes are detected, which is particularly useful during development as it allows developers to see their changes reflected immediately without having to manually restart the server. When you run this command, it will start the FastAPI application and make it accessible at a local URL (usually http://localhost:8000), where you can interact with the API endpoints defined in your application. This is essential for testing and developing your FastAPI application effectively.
+
+# Do i need to download anything to run this command?
+# Yes, to run the command `uvicorn app.main:app --reload`, you need to have Uvicorn installed in your Python environment. You can install it using pip with the following command:
+# pip install uvicorn
+
+# Which directory should i run this command in?
+
+
+
 async def run_agent_turn(case: BusinessCase) -> tuple[BusinessCase, AgentOutput]:
     """
     One turn of the ReAct loop.

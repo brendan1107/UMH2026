@@ -25,7 +25,6 @@ Task statuses: pending, scheduled, completed, skipped (SAD Section 11).
 
 # For example, when the AI identifies a task that requires a site visit to validate a specific fact, the user can view this task in the list of tasks for their case. Once they complete the task and submit their findings, the POST /api/cases/{case_id}/tasks/{task_id}/complete endpoint will be called, which will update the task status to completed and trigger a re-analysis of the business case with the new evidence. If the user decides to skip the task, the POST /api/cases/{case_id}/tasks/{task_id}/skip endpoint will be called, which will update the task status to skipped and adjust the AI's confidence in its recommendations accordingly. This iterative process allows users to gather real-world evidence and see how it impacts the AI's analysis and recommendations for their F&B business case.
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
@@ -33,28 +32,28 @@ router = APIRouter()
 
 
 @router.get("/{case_id}/tasks")
-async def list_tasks(case_id: str, db: Session = Depends(get_db)):
+async def list_tasks(case_id: str, db=Depends(get_db)):
     """List all investigation tasks for a business case."""
     # TODO: Return tasks with status
     pass
 
 
 @router.put("/{task_id}")
-async def update_task(task_id: str, db: Session = Depends(get_db)):
+async def update_task(task_id: str, db=Depends(get_db)):
     """Update task status (e.g., mark as completed with findings)."""
     # TODO: Update status, store findings, trigger re-analysis if completed
     pass
 
 
 @router.post("/{task_id}/complete")
-async def complete_task(task_id: str, db: Session = Depends(get_db)):
+async def complete_task(task_id: str, db=Depends(get_db)):
     """Mark a task as completed and submit findings for AI re-analysis."""
     # TODO: Store findings, trigger AI re-analysis (PRD Section 4.2: Re-analysis)
     pass
 
 
 @router.post("/{task_id}/skip")
-async def skip_task(task_id: str, db: Session = Depends(get_db)):
+async def skip_task(task_id: str, db=Depends(get_db)):
     """Skip a task (user chooses not to complete it)."""
     # TODO: Mark as skipped, note impact on recommendation confidence
     pass

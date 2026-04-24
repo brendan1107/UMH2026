@@ -24,7 +24,6 @@ competitor reviews, and evidence collection.
 # integration with Google Calendar enhances the user experience and helps users manage 
 # their time effectively as they work through their F&B business cases.
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
@@ -39,7 +38,7 @@ async def calendar_auth_callback():
 
 
 @router.post("/tasks/{task_id}/schedule")
-async def schedule_task(task_id: str, db: Session = Depends(get_db)):
+async def schedule_task(task_id: str, db=Depends(get_db)):
     """Add an investigation task as a Google Calendar event."""
     # TODO: Create calendar event from task details
     pass

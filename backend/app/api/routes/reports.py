@@ -26,7 +26,6 @@ Final verdict values: proceed, reconsider, do_not_open, improve, pivot, shut_dow
 # For example, when a user wants to view their business report, the GET /api/cases/{case_id}/report endpoint will be called to retrieve the current report content. If they want to generate a new report based on the latest evidence, the POST /api/cases/{case_id}/report endpoint will trigger the report generation process. Finally, if they want to download the report as a PDF, the GET /api/cases/{case_id}/report/pdf endpoint will return the generated PDF file for download.
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
@@ -34,21 +33,21 @@ router = APIRouter()
 
 
 @router.get("/{case_id}/report")
-async def get_report(case_id: str, db: Session = Depends(get_db)):
+async def get_report(case_id: str, db=Depends(get_db)):
     """Get the current business report and recommendation for a case."""
     # TODO: Return latest recommendation with report content
     pass
 
 
 @router.post("/{case_id}/report/generate")
-async def generate_report(case_id: str, db: Session = Depends(get_db)):
+async def generate_report(case_id: str, db=Depends(get_db)):
     """Trigger a full report generation based on all available evidence."""
     # TODO: Compile all facts, tasks, uploads into a comprehensive report
     pass
 
 
 @router.get("/{case_id}/report/pdf")
-async def export_report_pdf(case_id: str, db: Session = Depends(get_db)):
+async def export_report_pdf(case_id: str, db=Depends(get_db)):
     """Export the business report as a downloadable PDF."""
     # TODO: Generate PDF and return as streaming response
     pass

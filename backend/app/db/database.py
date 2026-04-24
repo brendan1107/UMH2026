@@ -19,19 +19,32 @@ Replaces SQLAlchemy/PostgreSQL — Firestore is a NoSQL document database.
 # parts of the application without having to repeat the initialization code. This 
 # promotes code reuse and keeps our database access organized.
 
+from pathlib import Path
+
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
 from app.config import settings
 
-# Initialize Firebase Admin SDK
-_cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-_app = firebase_admin.initialize_app(_cred, {
-    "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
-})
+firebase_initialization_error: Exception | None = None
 
-# Firestore client
-db = firestore.client()
+credential_path = Path(settings.FIREBASE_CREDENTIALS_PATH)
 
-# Storage bucket
-bucket = storage.bucket()
+if credential_path.exists():
+    # Initialize Firebase Admin SDK
+    _cred = credentials.Certificate(str(credential_path))
+    _app = firebase_admin.initialize_app(_cred, {
+        "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
+    })
+
+    # Firestore client
+    db = firestore.client()
+
+    # Storage bucket
+    bucket = storage.bucket()
+else:
+    firebase_initialization_error = FileNotFoundError(
+        f"Firebase credentials file not found: {credential_path}"
+    )
+    db = None
+    bucket = None
