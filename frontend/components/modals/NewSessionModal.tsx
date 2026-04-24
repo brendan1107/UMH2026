@@ -3,6 +3,8 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { casesService } from "../../lib/api/cases";
+import { uploadsService } from "../../lib/api/uploads";
 
 interface NewSessionModalProps {
   isOpen: boolean;
@@ -24,20 +26,40 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
 
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
 
     setIsSubmitting(true);
-    // Simulate network delay
-    setTimeout(() => {
+    try {
+      const newCase = await casesService.createCase({
+        title: "New Investigation", // You could derive this or let them name it later
+        description: description,
+        mode: sessionType,
+      });
+
       setIsSubmitting(false);
       setIsSuccess(true);
+      
+      // Upload any initial files if they exist
+      if (images.length > 0 || documents.length > 0) {
+        try {
+          const allFiles = [...images, ...documents];
+          await Promise.all(allFiles.map(file => uploadsService.uploadFile(newCase.id, file)));
+        } catch (uploadError) {
+          console.error("Failed to upload some initial files", uploadError);
+          // We don't block navigation on upload failure, they can re-upload in the workspace
+        }
+      }
+
       // Wait for success animation then navigate
       setTimeout(() => {
-        router.push(`/case/demo-session?type=${sessionType}`);
+        router.push(`/case/${newCase.id}`);
       }, 1000);
-    }, 800);
+    } catch (error) {
+      console.error("Failed to create session", error);
+      setIsSubmitting(false);
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

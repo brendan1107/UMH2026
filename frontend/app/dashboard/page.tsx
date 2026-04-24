@@ -7,41 +7,13 @@ import SettingsModal from "../../components/modals/SettingsModal";
 import { auth } from "../../lib/firebase";
 import { BusinessCase } from "../../lib/api/types";
 
-// Mock cases for dashboard
-const MOCK_CASES: BusinessCase[] = [
-  {
-    id: "case-1",
-    title: "Downtown Cafe Expansion",
-    description: "Analyzing the viability of a second location in the financial district.",
-    stage: "existing",
-    status: "active",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "case-2",
-    title: "Li Villas Western Eatery",
-    description: "Menu restructuring and cost analysis for dinner service.",
-    stage: "existing",
-    status: "insight_generated",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: "case-3",
-    title: "Struggling Dessert Kiosk",
-    description: "Evaluating whether to continue or pivot concept.",
-    stage: "existing",
-    status: "archived",
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    updatedAt: new Date(Date.now() - 172800000).toISOString()
-  }
-];
+import { casesService } from "../../lib/api/cases";
 
 export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [cases, setCases] = useState<BusinessCase[]>(MOCK_CASES);
+  const [cases, setCases] = useState<BusinessCase[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const currentUser = auth.currentUser;
 
@@ -50,23 +22,50 @@ export default function DashboardPage() {
   const [editTitle, setEditTitle] = useState("");
   const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
 
-  const handleRenameSubmit = (caseId: string) => {
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        if (!currentUser) return;
+        const data = await casesService.getCases();
+        setCases(data);
+      } catch (err) {
+        console.error("Failed to load cases", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCases();
+  }, [currentUser]);
+
+  const handleRenameSubmit = async (caseId: string) => {
     if (!editTitle.trim()) return;
-    // TODO: Connect to backend - casesService.updateCaseTitle(caseId, editTitle)
-    setCases(prev => prev.map(c => c.id === caseId ? { ...c, title: editTitle.trim() } : c));
+    try {
+      await casesService.updateCaseTitle(caseId, editTitle.trim());
+      setCases(prev => prev.map(c => c.id === caseId ? { ...c, title: editTitle.trim() } : c));
+    } catch (err) {
+      console.error("Failed to rename case", err);
+    }
     setEditingCaseId(null);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!deletingCaseId) return;
-    // TODO: Connect to backend - casesService.deleteCase(deletingCaseId)
-    setCases(prev => prev.filter(c => c.id !== deletingCaseId));
+    try {
+      await casesService.deleteCase(deletingCaseId);
+      setCases(prev => prev.filter(c => c.id !== deletingCaseId));
+    } catch (err) {
+      console.error("Failed to delete case", err);
+    }
     setDeletingCaseId(null);
   };
 
-  const handleReopen = (caseId: string) => {
-    // TODO: Connect to backend - casesService.reopenCase(caseId)
-    setCases(prev => prev.map(c => c.id === caseId ? { ...c, status: "active" } : c));
+  const handleReopen = async (caseId: string) => {
+    try {
+      await casesService.reopenCase(caseId);
+      setCases(prev => prev.map(c => c.id === caseId ? { ...c, status: "active" } : c));
+    } catch (err) {
+      console.error("Failed to reopen case", err);
+    }
   };
 
   return (
@@ -122,7 +121,11 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {cases.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+          </div>
+        ) : cases.length === 0 ? (
           <div className="bg-white  border border-slate-200  rounded-xl p-12 sm:p-16 text-center flex flex-col items-center justify-center min-h-[300px]">
             <div className="w-16 h-16 bg-slate-50  rounded-full flex items-center justify-center mb-4 border border-slate-100 ">
               <svg className="w-8 h-8 text-slate-400 " fill="none" viewBox="0 0 24 24" stroke="currentColor">

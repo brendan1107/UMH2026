@@ -6,15 +6,17 @@ import { RecommendationData } from "./types";
  */
 export const reportsService = {
   async getLatestRecommendation(caseId: string): Promise<RecommendationData> {
-    // TODO: Connect to REAL backend: GET /reports/{case_id}/report
-    // return apiClient.get<RecommendationData>(`/reports/${caseId}/report`);
-    
-    throw new Error("Report not generated yet");
+    return apiClient.get<RecommendationData>(`/reports/${caseId}/report`);
   },
 
   async exportPdf(caseId: string): Promise<void> {
-    // TODO: Connect to REAL backend: GET /reports/{case_id}/report/pdf
-    // const response = await apiClient.get<Blob>(`/reports/${caseId}/report/pdf`);
-    // ... handle blob download ...
+    const response = await apiClient.get<Blob>(`/reports/${caseId}/report/pdf`);
+    // Create a URL for the blob and trigger download
+    const url = window.URL.createObjectURL(response);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${caseId}.pdf`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 };

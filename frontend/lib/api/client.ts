@@ -1,6 +1,6 @@
 import { auth } from "../firebase";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
 /**
  * apiClient - Wrapper for fetch that automatically adds Firebase Auth tokens.
@@ -13,14 +13,14 @@ export const apiClient = {
   async post<T>(endpoint: string, body?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: "POST",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
     });
   },
 
   async put<T>(endpoint: string, body?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: "PUT",
-      body: body ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
     });
   },
 
@@ -36,7 +36,7 @@ export const apiClient = {
     const token = user ? await user.getIdToken() : null;
 
     const headers: HeadersInit = {
-      "Content-Type": "application/json",
+      ...(!(options.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     };

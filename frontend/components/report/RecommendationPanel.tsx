@@ -159,7 +159,7 @@ export default function RecommendationPanel({
             Key Strengths
           </h4>
           <ul className="space-y-2">
-            {data.strengths.map((item, i) => (
+            {(data.strengths || []).map((item, i) => (
               <li key={i} className="text-sm text-slate-700 bg-green-50/50 border border-green-100 rounded-lg p-2.5">
                 {item}
               </li>
@@ -173,7 +173,7 @@ export default function RecommendationPanel({
             Identified Risks
           </h4>
           <ul className="space-y-2">
-            {data.risks.map((item, i) => (
+            {(data.risks || []).map((item, i) => (
               <li key={i} className="text-sm text-slate-700 bg-red-50/50 border border-red-100 rounded-lg p-2.5">
                 {item}
               </li>

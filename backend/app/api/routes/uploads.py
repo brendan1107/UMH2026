@@ -1,65 +1,100 @@
-"""
-Evidence Upload Routes
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from google.cloud import firestore
+from firebase_admin import storage
+from datetime import datetime
+import time
+import uuid
 
-Handles file uploads (images, documents, photos) that users
-submit as evidence for their business investigation.
-Files are stored in Supabase Storage and processed by the AI.
-"""
-# This file defines the API endpoints for managing evidence uploads related to business
-#  cases.
-# The main functionalities include:
-# - Uploading evidence files (e.g., photos, documents, menus) for a specific business
-#  case. The upload process includes validating the file type and size, storing the file
-#  in Supabase Storage, creating a record in the evidence_uploads table, processing the
-#  file through the AI for summary and analysis, and triggering a re-analysis of the 
-# business case based on the new evidence.
-# - Listing all evidence uploads for a specific business case, allowing users to view
-#  the metadata of their uploaded files.
-# - Deleting an evidence upload, which involves removing the file from storage and
-#  deleting the corresponding record from the database.
-# The endpoints in this file will interact with the database to manage evidence upload
-# records and with Supabase Storage to handle the actual file uploads. This allows users
-#  to easily submit real-world evidence that the AI can analyze to provide more accurate
-# recommendations for their F&B business cases.
-
-# For example, when a user uploads a photo of a competitor's menu, the POST /api/cases/{case_id}/upload endpoint will be called to handle the file upload. The file will be validated and stored in Supabase Storage, and a new record will be created in the evidence_uploads table. The AI will then process the uploaded file to extract relevant information (e.g., menu items, prices) and update the business case analysis accordingly. Users can also view their uploaded evidence through the GET /api/cases/{case_id}/uploads endpoint and delete any unwanted uploads using the DELETE /api/uploads/{upload_id} endpoint. This functionality allows users to easily incorporate real-world evidence into their business investigations and see how it impacts the AI's recommendations.
-
-from fastapi import APIRouter, Depends, UploadFile, File
-
-from app.db.session import get_db
+from app.db.session import get_db, get_storage_bucket
+from app.dependencies import get_current_user
+from app.models.business_case import BusinessCase
+from app.models.evidence_upload import EvidenceUpload
 
 router = APIRouter()
 
-
 @router.post("/{case_id}/upload")
 async def upload_evidence(
-    case_id: str,
+    case_id: str, 
     file: UploadFile = File(...),
-    db=Depends(get_db),
+    db: firestore.Client = Depends(get_db),
+    bucket: storage.bucket = Depends(get_storage_bucket),
+    user: dict = Depends(get_current_user)
 ):
-    """
-    Upload evidence file (photo, document, menu, etc.).
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    if not case_ref.get().exists:
+        raise HTTPException(status_code=404, detail="Case not found")
 
-    Flow:
-    1. Validate file type and size
-    2. Upload to Supabase Storage
-    3. Create evidence_uploads record
-    4. Process through AI for summary/analysis
-    5. Trigger re-analysis of business case
-    """
-    # TODO: Implement upload pipeline
-    pass
+    # Upload to Storage
+    ext = file.filename.split(".")[-1] if "." in file.filename else ""
+    blob_name = f"cases/{case_id}/evidence/{uuid.uuid4()}.{ext}"
+    blob = bucket.blob(blob_name)
+    
+    contents = await file.read()
+    blob.upload_from_string(contents, content_type=file.content_type)
+    blob.make_public()
+    
+    public_url = blob.public_url
 
+    # Store metadata in Firestore
+    size_mb = f"{len(contents) / (1024 * 1024):.1f} MB"
+    is_image = file.content_type.startswith("image")
+    
+    upload = EvidenceUpload(
+        case_id=case_id,
+        name=file.filename,
+        size=size_mb,
+        type="image" if is_image else "document",
+        url=public_url,
+        storage_path=blob_name
+    )
+    
+    upload_ref = case_ref.collection(EvidenceUpload.SUBCOLLECTION).document()
+    upload_dict = upload.to_dict()
+    upload_ref.set(upload_dict)
+    
+    upload_dict["id"] = upload_ref.id
+    return upload_dict
 
 @router.get("/{case_id}/uploads")
-async def list_uploads(case_id: str, db=Depends(get_db)):
-    """List all evidence uploads for a business case."""
-    # TODO: Return upload metadata
-    pass
+async def list_uploads(
+    case_id: str,
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    uploads_ref = case_ref.collection(EvidenceUpload.SUBCOLLECTION).stream()
+    
+    uploads = []
+    for doc in uploads_ref:
+        data = doc.to_dict()
+        data["id"] = doc.id
+        uploads.append(data)
+        
+    return uploads
 
-
-@router.delete("/{upload_id}")
-async def delete_upload(upload_id: str, db=Depends(get_db)):
-    """Delete an evidence upload."""
-    # TODO: Remove from storage and database
-    pass
+@router.delete("/{case_id}/uploads/{upload_id}")
+async def delete_upload(
+    case_id: str,
+    upload_id: str,
+    db: firestore.Client = Depends(get_db),
+    bucket: storage.bucket = Depends(get_storage_bucket),
+    user: dict = Depends(get_current_user)
+):
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    upload_ref = case_ref.collection(EvidenceUpload.SUBCOLLECTION).document(upload_id)
+    doc = upload_ref.get()
+    
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Upload not found")
+        
+    data = doc.to_dict()
+    
+    # Delete from storage
+    if data.get("storage_path"):
+        blob = bucket.blob(data["storage_path"])
+        if blob.exists():
+            blob.delete()
+            
+    # Delete from Firestore
+    upload_ref.delete()
+    return {"status": "success"}
