@@ -1,0 +1,691 @@
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of C:\Users\liang\Downloads\UMH2026\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * C:\Users\liang\Downloads\UMH2026\frontend\package-lock.json
+
+[browser] Failed to load cases Error: Invalid or expired Firebase token
+    at Object.request (lib/api/client.ts:53:13)
+    at async DashboardPage.useEffect.fetchCases (app/dashboard/page.tsx:29:22)
+  51 |     if (!response.ok) {
+  52 |       const errorData = await response.json().catch(() => ({}));
+> 53 |       throw new Error(errorData.detail || `API request failed: ${response.status}`);
+     |             ^
+  54 |     }
+  55 |
+  56 |     // Handles empty responses (like 204 No Content) (app/dashboard/page.tsx:32:17)
+[browser] Failed to load cases Error: Invalid or expired Firebase token
+    at Object.request (lib/api/client.ts:53:13)
+    at async DashboardPage.useEffect.fetchCases (app/dashboard/page.tsx:29:22)
+  51 |     if (!response.ok) {
+  52 |       const errorData = await response.json().catch(() => ({}));
+> 53 |       throw new Error(errorData.detail || `API request failed: ${response.status}`);
+     |             ^
+  54 |     }
+  55 |
+  56 |     // Handles empty responses (like 204 No Content) (app/dashboard/page.tsx:32:17)
+⨯ ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+  [90m4 |[0m [36mimport[0m { motion, [33mAnimatePresence[0m } [36mfrom[0m [32m"framer-motion"[0m;
+[31m[1m>[0m [90m5 |[0m [36mimport[0m { [33mGoogleMap[0m, useLoadScript, [33mMarker[0m } [36mfrom[0m [32m"@react-google-maps/api"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m [36mimport[0m { [33mTask[0m } [36mfrom[0m [32m"../tasks/TaskList"[0m;
+  [90m7 |[0m
+  [90m8 |[0m [36mconst[0m mapContainerStyle = { width: [32m"100%"[0m, height: [32m"100%"[0m };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+⨯ ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+  [90m4 |[0m [36mimport[0m { motion, [33mAnimatePresence[0m } [36mfrom[0m [32m"framer-motion"[0m;
+[31m[1m>[0m [90m5 |[0m [36mimport[0m { [33mGoogleMap[0m, useLoadScript, [33mMarker[0m } [36mfrom[0m [32m"@react-google-maps/api"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m6 |[0m [36mimport[0m { [33mTask[0m } [36mfrom[0m [32m"../tasks/TaskList"[0m;
+  [90m7 |[0m
+  [90m8 |[0m [36mconst[0m mapContainerStyle = { width: [32m"100%"[0m, height: [32m"100%"[0m };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+    at console.overrideMethod [as error] (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822) (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:174822)
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] Uncaught Error: ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (Error: ./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (Error: (./frontend/components/modals/TaskActionModal.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./frontend/components/modals/TaskActionModal.tsx:5:1
+Module not found: Can't resolve '@react-google-maps/api'
+  3 | import { useState } from "react";
+  4 | import { motion, AnimatePresence } from "framer-motion";
+> 5 | import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { Task } from "../tasks/TaskList";
+  7 |
+  8 | const mapContainerStyle = { width: "100%", height: "100%" };
+
+Import traces:
+  Client Component Browser:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Client Component Browser]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./frontend/components/modals/TaskActionModal.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Client Component SSR]
+    ./frontend/app/case/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 

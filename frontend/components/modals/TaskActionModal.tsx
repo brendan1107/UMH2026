@@ -1,39 +1,222 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import { Task } from "../tasks/TaskList";
 
-const mapContainerStyle = { width: "100%", height: "100%" };
 const defaultCenter = { lat: 37.7749, lng: -122.4194 };
+const googleMapsScriptId = "google-maps-js-api";
 
-function MapSelector({ currentLocation, onSelect }: { currentLocation: any, onSelect: (loc: any) => void }) {
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "", 
+type SelectedLocation = { lat: number; lng: number; address: string };
+type MapPoint = Pick<SelectedLocation, "lat" | "lng">;
+type GoogleMapsLatLng = { lat: () => number; lng: () => number };
+type GoogleMapsMouseEvent = { latLng?: GoogleMapsLatLng | null };
+type GoogleMapsListener = { remove: () => void };
+type GoogleMapsMap = {
+  addListener: (eventName: "click", handler: (event: GoogleMapsMouseEvent) => void) => GoogleMapsListener;
+  panTo: (position: MapPoint) => void;
+};
+type GoogleMapsMarker = {
+  setMap: (map: GoogleMapsMap | null) => void;
+  setPosition: (position: MapPoint) => void;
+};
+type GoogleMapsApi = {
+  Map: new (element: HTMLElement, options: { center: MapPoint; zoom: number; clickableIcons: boolean }) => GoogleMapsMap;
+  Marker: new (options: { position: MapPoint; map: GoogleMapsMap }) => GoogleMapsMarker;
+};
+type GoogleMapsWindow = Window & {
+  google?: { maps?: GoogleMapsApi };
+  __googleMapsLoadPromise?: Promise<GoogleMapsApi>;
+};
+type ChoiceOption = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  pros?: string[];
+  cons?: string[];
+};
+type Question = {
+  id: string;
+  label: string;
+  placeholder?: string;
+};
+type TaskData = {
+  description?: string;
+  options?: ChoiceOption[];
+  questions?: Question[];
+  eventTitle?: string;
+  eventDuration?: string;
+};
+type TaskActionData =
+  | { text: string }
+  | { answers: Record<string, string> }
+  | { selectedOption: string | null }
+  | { location: SelectedLocation | null }
+  | { eventDate: string }
+  | Record<string, never>;
+
+function getGoogleMapsWindow() {
+  return window as GoogleMapsWindow;
+}
+
+function getTaskData(task: Task): TaskData {
+  return (task.data ?? {}) as TaskData;
+}
+
+function loadGoogleMaps(apiKey: string): Promise<GoogleMapsApi> {
+  const browserWindow = getGoogleMapsWindow();
+
+  if (browserWindow.google?.maps) {
+    return Promise.resolve(browserWindow.google.maps);
+  }
+
+  if (browserWindow.__googleMapsLoadPromise) {
+    return browserWindow.__googleMapsLoadPromise;
+  }
+
+  browserWindow.__googleMapsLoadPromise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(googleMapsScriptId) as HTMLScriptElement | null;
+    const handleLoad = () => {
+      if (browserWindow.google?.maps) {
+        resolve(browserWindow.google.maps);
+      } else {
+        reject(new Error("Google Maps API failed to initialize."));
+      }
+    };
+    const handleError = () => reject(new Error("Google Maps API failed to load."));
+
+    if (existingScript) {
+      existingScript.addEventListener("load", handleLoad, { once: true });
+      existingScript.addEventListener("error", handleError, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = googleMapsScriptId;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+    document.head.appendChild(script);
   });
 
-  const [markerPos, setMarkerPos] = useState<google.maps.LatLngLiteral | null>(currentLocation);
+  return browserWindow.__googleMapsLoadPromise;
+}
 
-  if (loadError) return <div className="p-4 text-red-500">Error loading maps</div>;
-  if (!isLoaded) return <div className="p-4 text-slate-500 flex justify-center items-center h-full">Loading Maps...</div>;
+function MapSelector({ currentLocation, onSelect }: { currentLocation: SelectedLocation | null, onSelect: (loc: SelectedLocation) => void }) {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<GoogleMapsMap | null>(null);
+  const markerRef = useRef<GoogleMapsMarker | null>(null);
+  const currentLocationRef = useRef(currentLocation);
+  const onSelectRef = useRef(onSelect);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const status = apiKey ? loadStatus : "missing-key";
+
+  useEffect(() => {
+    currentLocationRef.current = currentLocation;
+  }, [currentLocation]);
+
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  useEffect(() => {
+    if (!apiKey) {
+      return;
+    }
+
+    let cancelled = false;
+    let clickListener: GoogleMapsListener | undefined;
+
+    loadGoogleMaps(apiKey)
+      .then((maps) => {
+        if (cancelled || !mapRef.current) return;
+
+        const initialLocation = currentLocationRef.current;
+        const initialMarker = initialLocation ? { lat: initialLocation.lat, lng: initialLocation.lng } : null;
+        const map = new maps.Map(mapRef.current, {
+          center: initialMarker || defaultCenter,
+          zoom: 12,
+          clickableIcons: false,
+        });
+
+        mapInstanceRef.current = map;
+        if (initialMarker) {
+          markerRef.current = new maps.Marker({ position: initialMarker, map });
+        }
+
+        clickListener = map.addListener("click", (event: GoogleMapsMouseEvent) => {
+          if (!event.latLng) return;
+
+          const lat = event.latLng.lat();
+          const lng = event.latLng.lng();
+          const nextLocation = {
+            lat,
+            lng,
+            address: `Selected Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+          };
+
+          onSelectRef.current(nextLocation);
+        });
+
+        setLoadStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setLoadStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+      if (clickListener) clickListener.remove();
+      if (markerRef.current) markerRef.current.setMap(null);
+      markerRef.current = null;
+      mapInstanceRef.current = null;
+    };
+  }, [apiKey]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const maps = getGoogleMapsWindow().google?.maps;
+
+    if (!map || !maps) return;
+
+    const markerPos = currentLocation ? { lat: currentLocation.lat, lng: currentLocation.lng } : null;
+
+    if (!markerPos) {
+      if (markerRef.current) markerRef.current.setMap(null);
+      markerRef.current = null;
+      return;
+    }
+
+    if (markerRef.current) {
+      markerRef.current.setPosition(markerPos);
+    } else {
+      markerRef.current = new maps.Marker({ position: markerPos, map });
+    }
+    map.panTo(markerPos);
+  }, [currentLocation]);
 
   return (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      zoom={12}
-      center={markerPos || defaultCenter}
-      onClick={(e) => {
-        if (e.latLng) {
-          const lat = e.latLng.lat();
-          const lng = e.latLng.lng();
-          setMarkerPos({ lat, lng });
-          onSelect({ lat, lng, address: `Selected Location (${lat.toFixed(4)}, ${lng.toFixed(4)})` });
-        }
-      }}
-    >
-      {markerPos && <Marker position={markerPos} />}
-    </GoogleMap>
+    <div className="relative h-full w-full">
+      <div ref={mapRef} className="h-full w-full" />
+      {status === "loading" && (
+        <div className="absolute inset-0 p-4 text-slate-500 bg-slate-100 flex justify-center items-center">
+          Loading Maps...
+        </div>
+      )}
+      {status === "missing-key" && (
+        <div className="absolute inset-0 p-4 text-amber-700 bg-amber-50 flex justify-center items-center text-center">
+          Google Maps API key is missing.
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 p-4 text-red-500 bg-red-50 flex justify-center items-center text-center">
+          Error loading maps.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -41,7 +224,7 @@ interface TaskActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: Task | null;
-  onSubmit: (taskId: string, actionData: any) => void;
+  onSubmit: (taskId: string, actionData: TaskActionData) => void;
 }
 
 export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: TaskActionModalProps) {
@@ -52,11 +235,10 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
   const [eventDate, setEventDate] = useState<string>("");
 
   if (!task) return null;
+  const taskData = getTaskData(task);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    let submitData = {};
+  const submitAction = () => {
+    let submitData: TaskActionData = {};
     if (task.type === "provide_text_input") submitData = { text: textInput };
     if (task.type === "answer_questions") submitData = { answers };
     if (task.type === "choose_option") submitData = { selectedOption };
@@ -73,15 +255,20 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
     setEventDate("");
   };
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    submitAction();
+  };
+
   const renderContent = () => {
     switch (task.type) {
       case "choose_option":
-        const options = task.data?.options || [];
+        const options = taskData.options || [];
         return (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600 mb-4">{task.data?.description || "Select an option below:"}</p>
+            <p className="text-sm text-slate-600 mb-4">{taskData.description || "Select an option below:"}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {options.map((opt: any) => (
+              {options.map((opt) => (
                 <div 
                   key={opt.id}
                   onClick={() => setSelectedOption(opt.id)}
@@ -113,11 +300,11 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
         );
 
       case "answer_questions":
-        const questions = task.data?.questions || [];
+        const questions = taskData.questions || [];
         return (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600 mb-4">{task.data?.description || "Please provide some additional details:"}</p>
-            {questions.map((q: any) => (
+            <p className="text-sm text-slate-600 mb-4">{taskData.description || "Please provide some additional details:"}</p>
+            {questions.map((q) => (
               <div key={q.id}>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{q.label}</label>
                 <textarea
@@ -135,7 +322,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
       case "review_ai_suggestions":
         return (
           <div className="space-y-4">
-             <p className="text-sm text-slate-600 mb-2">{task.data?.description || "Provide your input:"}</p>
+             <p className="text-sm text-slate-600 mb-2">{taskData.description || "Provide your input:"}</p>
              <textarea
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
@@ -160,7 +347,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
       case "select_location":
         return (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600 mb-4">{task.data?.description || "Select your location from the map:"}</p>
+            <p className="text-sm text-slate-600 mb-4">{taskData.description || "Select your location from the map:"}</p>
             <div className="w-full h-64 bg-slate-100 rounded-lg overflow-hidden border border-slate-300 relative">
               <MapSelector currentLocation={location} onSelect={setLocation} />
             </div>
@@ -185,7 +372,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
         return (
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
-              <p className="text-sm text-slate-600">{task.data?.description || "Save an event to Google Calendar:"}</p>
+              <p className="text-sm text-slate-600">{taskData.description || "Save an event to Google Calendar:"}</p>
               <button 
                 type="button" 
                 onClick={handleAutoGenerate}
@@ -202,8 +389,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
                   </svg>
                 </div>
                 <div>
-                  <h4 className="font-medium text-slate-900">{task.data?.eventTitle || "Investigation Meeting"}</h4>
-                  <p className="text-xs text-slate-500">{task.data?.eventDuration || "1 hour"}</p>
+                  <h4 className="font-medium text-slate-900">{taskData.eventTitle || "Investigation Meeting"}</h4>
+                  <p className="text-xs text-slate-500">{taskData.eventDuration || "1 hour"}</p>
                 </div>
               </div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Select Date & Time</label>
@@ -222,7 +409,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
                     if (data.auth_url) {
                       window.open(data.auth_url, "_blank");
                     }
-                  } catch (e) {
+                  } catch {
                     alert("Failed to request calendar access.");
                   }
                 }}>
@@ -241,7 +428,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
   const isSubmitDisabled = () => {
     if (task.type === "choose_option") return !selectedOption;
     if (task.type === "answer_questions") {
-      const requiredCount = task.data?.questions?.length || 0;
+      const requiredCount = taskData.questions?.length || 0;
       return Object.keys(answers).length < requiredCount || Object.values(answers).some(val => !val.trim());
     }
     if (task.type === "provide_text_input") return !textInput.trim();
@@ -296,7 +483,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmit}
+                  onClick={submitAction}
                   disabled={isSubmitDisabled()}
                   className="px-6 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >

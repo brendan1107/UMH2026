@@ -1,0 +1,28 @@
+
+> frontend@0.1.0 dev
+> next dev --hostname 127.0.0.1 --port 3000
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+✓ Ready in 608ms
+Creating turbopack project {
+  dir: 'C:\\Users\\liang\\Downloads\\UMH2026\\frontend',
+  testMode: true
+}
+
+ GET / 200 in 521ms (next.js: 218ms, application-code: 304ms)
+ GET / 200 in 52ms (next.js: 7ms, application-code: 45ms)
+ GET /dashboard 200 in 72ms (next.js: 35ms, application-code: 37ms)
+ GET /case/zFdmgN3x94nFN4dmKJed 500 in 1367ms (next.js: 1180ms, application-code: 187ms)
+ GET /case/zFdmgN3x94nFN4dmKJed 500 in 27ms (next.js: 13ms, application-code: 15ms)
+ GET /dashboard 500 in 23ms (next.js: 12ms, application-code: 11ms)
+ GET / 500 in 22ms (next.js: 9ms, application-code: 12ms)
+ GET / 500 in 18ms (next.js: 8ms, application-code: 10ms)
+✓ Compiled in 104ms
+ GET / 200 in 353ms (next.js: 98ms, application-code: 255ms)
+ GET /dashboard 200 in 51ms (next.js: 13ms, application-code: 37ms)
+ GET /dashboard 200 in 156ms (next.js: 74ms, application-code: 82ms)
+ GET /dashboard 200 in 114ms (next.js: 60ms, application-code: 55ms)
+ GET /dashboard 200 in 111ms (next.js: 59ms, application-code: 52ms)
+ GET /dashboard 200 in 139ms (next.js: 78ms, application-code: 61ms)
