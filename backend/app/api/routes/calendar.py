@@ -61,9 +61,12 @@ class ScheduleRequest(BaseModel):
 @router.get("/auth/url")
 async def get_auth_url():
     """Return the Google OAuth2 URL to request Calendar access."""
-    # In a real app, this would use google-auth-oauthlib to generate the URL
+    from app.config import settings
+    client_id = settings.GOOGLE_CALENDAR_CLIENT_ID or "MOCK_CLIENT_ID"
+    # Simple redirect URL to localhost:3000 for development testing
+    redirect_uri = "http://localhost:3000/api/calendar/callback"
     return {
-        "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=MOCK_CLIENT_ID&redirect_uri=MOCK_REDIRECT&scope=https://www.googleapis.com/auth/calendar.events&response_type=code"
+        "auth_url": f"https://accounts.google.com/o/oauth2/v2/auth?client_id={client_id}&redirect_uri={redirect_uri}&scope=https://www.googleapis.com/auth/calendar.events&response_type=code&access_type=offline"
     }
 
 

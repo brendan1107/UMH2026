@@ -48,46 +48,87 @@ async def glm_call(
     system: str,
 ) -> AgentOutput:
     base_url, api_key, model = _get_glm_config()
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            *messages,
-        ],
-        "temperature": 0.2,
-        "max_tokens": 2000,
-    }
-
-    async with httpx.AsyncClient(timeout=60, http2=False) as client:
-        try:
-            resp = await client.post(
-                f"{base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json=payload,
-            )
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                "GLM API request failed: status=%s body=%s",
-                exc.response.status_code,
-                exc.response.text[:500],
-            )
-            if settings.APP_ENV == "development" and exc.response.status_code == 401:
-                logger.warning(
-                    "Using development fallback AI output because GLM authentication failed."
+    
+    # Check if we are actually using Gemini. If so, use the native API to support search.
+    is_gemini = "gemini" in model.lower() or "generativelanguage" in base_url
+    
+    if is_gemini:
+        # Use native Gemini API
+        gemini_messages = []
+        for msg in messages:
+            role = "model" if msg["role"] == "assistant" else "user"
+            gemini_messages.append({
+                "role": role,
+                "parts": [{"text": msg["content"]}]
+            })
+            
+        payload = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": gemini_messages,
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 2000,
+            },
+            "tools": [{"googleSearch": {}}]
+        }
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        
+        async with httpx.AsyncClient(timeout=60, http2=False) as client:
+            try:
+                resp = await client.post(api_url, json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "Gemini API request failed: status=%s body=%s",
+                    exc.response.status_code,
+                    exc.response.text[:500],
                 )
-                return _development_fallback_output()
-            raise
-        except httpx.HTTPError:
-            logger.exception("GLM API request failed before receiving a response.")
-            raise
-
-        raw = resp.json()
-
-    content = raw["choices"][0]["message"]["content"]
+                if settings.APP_ENV == "development" and exc.response.status_code == 400:
+                    logger.warning("Using development fallback AI output due to API error.")
+                    return _development_fallback_output()
+                raise
+                
+            raw = resp.json()
+            try:
+                content = raw["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError):
+                raise ValueError(f"Unexpected Gemini response structure: {raw}")
+    else:
+        # Fallback to OpenAI compatibility layer for other models (e.g. Zhipu GLM)
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                *messages,
+            ],
+            "temperature": 0.2,
+            "max_tokens": 2000,
+        }
+    
+        async with httpx.AsyncClient(timeout=60, http2=False) as client:
+            try:
+                resp = await client.post(
+                    f"{base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json=payload,
+                )
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "GLM API request failed: status=%s body=%s",
+                    exc.response.status_code,
+                    exc.response.text[:500],
+                )
+                if settings.APP_ENV == "development" and exc.response.status_code == 401:
+                    logger.warning("Using development fallback AI output because GLM auth failed.")
+                    return _development_fallback_output()
+                raise
+    
+            raw = resp.json()
+            content = raw["choices"][0]["message"]["content"]
 
     if content is None:
-        raise ValueError(f"GLM returned null content. Full response: {raw}")
+        raise ValueError(f"AI returned null content. Full response: {raw}")
 
     content = content.strip()
     if content.startswith("```"):
@@ -98,12 +139,11 @@ async def glm_call(
 
     data = json.loads(content)
 
-    # GLM sometimes wraps response in a list — unwrap it
     if isinstance(data, list):
         data = data[0]
 
     if not isinstance(data, dict) or "type" not in data:
-        raise ValueError(f"Unexpected GLM response shape: {data}")
+        raise ValueError(f"Unexpected AI response shape: {data}")
 
     type_map = {
         "tool_call":  "ToolCallOutput",

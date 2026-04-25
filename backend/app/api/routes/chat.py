@@ -47,12 +47,20 @@ def _create_task_from_field_task(case_ref, case_id: str, output) -> dict:
         "photo": "upload_image",
         "rating": "provide_text_input",
         "text": "provide_text_input",
+        "location": "select_location",
+        "schedule": "schedule_event",
+        "decision": "choose_option",
+        "questions": "answer_questions",
     }
     action_label_by_evidence = {
         "count": "Submit count",
         "photo": "Upload evidence",
         "rating": "Submit rating",
         "text": "Submit finding",
+        "location": "Select Location",
+        "schedule": "Schedule Event",
+        "decision": "Make Decision",
+        "questions": "Answer Questions",
     }
     task_dict = {
         "case_id": case_id,
@@ -64,6 +72,10 @@ def _create_task_from_field_task(case_ref, case_id: str, output) -> dict:
         "data": {
             "description": output.instruction,
             "evidence_type": output.evidence_type,
+            "options": [opt.model_dump() for opt in output.options] if getattr(output, 'options', None) else None,
+            "questions": [q.model_dump() for q in output.questions] if getattr(output, 'questions', None) else None,
+            "eventTitle": getattr(output, 'event_title', None),
+            "eventDuration": getattr(output, 'event_duration', None),
         },
         "source": "ai",
         "created_at": now,
