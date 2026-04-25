@@ -16,6 +16,7 @@ from app.dependencies import get_current_user
 from app.models.business_case import BusinessCase
 from app.models.chat import ChatSession, ChatMessage
 from app.utils.helpers import snake_dict_to_camel
+from app.services.chat_service import ChatService
 
 # ──  AI imports ──
 from app.ai.orchestrator import run_agent_turn
@@ -34,6 +35,8 @@ async def create_session(
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     if not case_ref.get().exists:
         raise HTTPException(status_code=404, detail="Case not found")
+    service = ChatService(db)
+    return await service.create_session(case_id)
 
     session = ChatSession(case_id=case_id)
     session_dict = session.to_dict()
@@ -61,6 +64,7 @@ async def list_sessions(
         data["id"] = doc.id
         sessions.append(snake_dict_to_camel(data))
 
+        sessions.append(data)
     return sessions
 
 # keep create_session, list_sessions, get_messages unchanged 
@@ -193,3 +197,5 @@ async def get_messages(
         messages.append(snake_dict_to_camel(data))
 
     return messages
+    service = ChatService(db)
+    return await service.get_session_history(case_id, session_id)

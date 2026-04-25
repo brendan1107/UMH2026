@@ -26,6 +26,16 @@ class BusinessCase:
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
+    # ── AI agent state ──────────────────────────────────────
+    # budget_myr: the user's stated startup budget in Malaysian Ringgit
+    # ai_phase: current phase of the ReAct investigation loop (INTAKE → VERDICT)
+    # fact_sheet: grows as tools return data and user submits evidence
+    # ai_messages: full GLM conversation history, persisted across turns
+    budget_myr: float = 30000.0
+    ai_phase: str = "INTAKE"
+    fact_sheet: dict = field(default_factory=dict)
+    ai_messages: list = field(default_factory=list)
+
     def to_dict(self) -> dict:
         return {
             "user_id": self.user_id,
@@ -37,6 +47,11 @@ class BusinessCase:
             "status": self.status,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            # AI state — persisted so agent can resume across sessions
+            "budget_myr": self.budget_myr,
+            "ai_phase": self.ai_phase,
+            "fact_sheet": self.fact_sheet,
+            "ai_messages": self.ai_messages,
         }
 
     @staticmethod
@@ -52,6 +67,11 @@ class BusinessCase:
             status=data.get("status", "active"),
             created_at=data.get("created_at", datetime.utcnow()),
             updated_at=data.get("updated_at", datetime.utcnow()),
+            # AI state
+            budget_myr=float(data.get("budget_myr", 30000.0)),
+            ai_phase=data.get("ai_phase", "INTAKE"),
+            fact_sheet=data.get("fact_sheet", {}),
+            ai_messages=data.get("ai_messages", []),
         )
 
     COLLECTION = "business_cases"
