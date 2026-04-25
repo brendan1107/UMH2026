@@ -17,6 +17,7 @@ class CaseCreate(BaseModel):
     stage: str = "new"  # new | existing
     business_type: Optional[str] = None
     target_location: Optional[str] = None
+    budget_myr: float = 30000.0       # startup budget in MYR, used by AI agent
 
 
 class CaseUpdate(BaseModel):
@@ -38,6 +39,7 @@ class CaseResponse(BaseModel):
     target_location: Optional[str]
     status: str
     created_at: datetime
+    budget_myr: float = 30000.0       # included in response so frontend can display it
 
     class Config:
         from_attributes = True

@@ -9,26 +9,35 @@ Handles GLM's shorter context window through summarization and filtering
 """
 
 
+"""Context Builder — trims conversation history to fit GLM's context window."""
+
+import json
+
+MAX_MESSAGES = 20
+MAX_FACT_CHARS = 2000
+
+
 class ContextBuilder:
     """Builds optimized context for GLM prompts."""
 
-    def build_context(self, case_id: str) -> dict:
+    def build_context(self, case) -> list[dict]:
         """
-        Assemble full context for AI reasoning.
-
-        Includes:
-        - Latest user input
-        - Structured business facts
-        - Conversation summary (not full raw history)
-        - Google Places/Maps results
-        - Uploaded evidence summaries
-        - Generated tasks and their status
-        - Prior recommendation state
+        Return trimmed message list safe to send to GLM.
+        Keeps first message (original brief) + last MAX_MESSAGES-1 turns.
         """
-        # TODO: Query all relevant data and build context dict
-        pass
+        messages = case.messages
+        if len(messages) > MAX_MESSAGES:
+            messages = [messages[0]] + messages[-(MAX_MESSAGES - 1):]
+        return messages
 
     def truncate_context(self, context: dict, max_tokens: int) -> dict:
-        """Truncate context to fit within GLM's token limit."""
-        # TODO: Prioritize decision-relevant data, summarize older turns
-        pass
+        """
+        Truncate fact sheet if it's getting too large.
+        Drops oldest keys first, keeps most recently added facts.
+        """
+        facts = context.get("fact_sheet", {})
+        keys = list(facts.keys())
+        while keys and len(json.dumps({k: facts[k] for k in keys})) > MAX_FACT_CHARS:
+            keys.pop(0)
+        context["fact_sheet"] = {k: facts[k] for k in keys}
+        return context

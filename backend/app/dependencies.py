@@ -10,6 +10,7 @@ authenticated user context, and service instances.
 
 import logging
 
+import os
 from fastapi import Depends, HTTPException, Request, status
 from firebase_admin import auth as firebase_auth
 
@@ -24,21 +25,18 @@ async def get_current_user(request: Request):
     Dependency to extract and validate the current authenticated user
     using Firebase Auth ID token from the Authorization header.
 
-    If DEV_AUTH_BYPASS=true in env, returns a fake dev user without
-    requiring a real Firebase token. This MUST be disabled in production.
+    In development mode (APP_ENV=development), accepts a special test token
+    "dev-bypass" to skip Firebase verification for easier local testing.
     """
-    # ── Dev bypass (opt-in via env flag, disabled by default) ──
-    if settings.DEV_AUTH_BYPASS:
-        logger.warning(
-            "DEV_AUTH_BYPASS is enabled — skipping Firebase token verification. "
-            "Do NOT use this in production!"
-        )
-        return {
-            "uid": "dev-user-000",
-            "email": "dev@localhost",
-            "name": "Dev User",
-        }
 
+    # ── Dev bypass — only works when APP_ENV=development ──
+    # To use: send header  Authorization: Bearer dev-bypass
+    if os.getenv("APP_ENV") == "development":
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header == "Bearer dev-bypass":
+            return {"uid": "dev-user-001", "email": "dev@test.com"}
+
+    # ── Normal Firebase auth ───────────────────────────────
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
