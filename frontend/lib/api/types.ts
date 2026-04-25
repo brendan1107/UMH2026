@@ -28,16 +28,51 @@ export type TaskType =
   | "upload_file" 
   | "upload_image" 
   | "provide_text_input" 
-  | "review_ai_suggestions";
+  | "review_ai_suggestions"
+  | "select_location"
+  | "schedule_event";
+
+export type TaskActionData =
+  | { text: string }
+  | { answers: Record<string, string> }
+  | { selectedOption: string | null }
+  | { location: { lat: number; lng: number; address: string } | null }
+  | { eventDate: string }
+  | {
+      uploadId: string;
+      fileName: string;
+      fileType?: string;
+      fileSize?: number;
+      storagePath?: string;
+      storageMode?: string;
+      url?: string;
+    }
+  | Record<string, unknown>;
+
+export interface TaskCreatePayload {
+  title: string;
+  description?: string;
+  type?: TaskType;
+  status?: TaskStatus;
+  actionLabel?: string;
+  data?: Record<string, unknown>;
+  source?: string;
+}
 
 export interface InvestigationTask {
   id: string;
+  caseId?: string;
   title: string;
   description?: string;
   status: TaskStatus;
   type: TaskType;
   actionLabel?: string;
-  data?: any;
+  data?: Record<string, unknown>;
+  source?: string;
+  submittedValue?: TaskActionData;
+  completedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChatMessage {

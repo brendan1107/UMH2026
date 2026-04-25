@@ -1,179 +1,128 @@
-"""
-Investigation Tasks Routes
+# app/api/routes/tasks.py
+import io
+import httpx
+import base64
+import PyPDF2
+import pandas as pd
 
-CRUD endpoints for tasks associated with a business case.
-Tasks are stored as a Firestore subcollection:
-  business_cases/{case_id}/tasks/{task_id}
-"""
 from fastapi import APIRouter, Depends, HTTPException
 from google.cloud import firestore
-from datetime import datetime
+import json
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.business_case import BusinessCase
-from app.schemas.task import TaskCreate, TaskStatusUpdate
-from app.utils.helpers import snake_dict_to_camel
+from app.models.investigation_task import InvestigationTask
 
 router = APIRouter()
 
-# Subcollection name for tasks directly under a case
-TASKS_SUBCOLLECTION = "tasks"
-
-
-def _task_response(doc_id: str, data: dict, case_id: str) -> dict:
-    """Build a consistent camelCase response dict for a task document."""
-    data["id"] = doc_id
-    data["case_id"] = case_id
-    return snake_dict_to_camel(data)
-
-
-def _get_case_ref(db, case_id: str, user_uid: str):
-    """Verify case exists and belongs to user. Returns case doc ref."""
-    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
-    case_doc = case_ref.get()
-    if not case_doc.exists:
-        raise HTTPException(status_code=404, detail="Case not found")
-    if case_doc.to_dict().get("user_id") != user_uid:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return case_ref
-
-
-# ────────────────────────────────────────────────────────────────
-# CRUD
-# ────────────────────────────────────────────────────────────────
-
-@router.get("/{case_id}")
+@router.get("/{case_id}/tasks")
 async def list_tasks(
     case_id: str,
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    """List all tasks for a business case."""
-    case_ref = _get_case_ref(db, case_id, user["uid"])
-    tasks_ref = case_ref.collection(TASKS_SUBCOLLECTION).order_by("created_at").stream()
-
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    tasks_ref = case_ref.collection(InvestigationTask.SUBCOLLECTION).stream()
+    
     tasks = []
     for doc in tasks_ref:
-        tasks.append(_task_response(doc.id, doc.to_dict(), case_id))
-
+        data = doc.to_dict()
+        data["id"] = doc.id
+        tasks.append(data)
+        
     return tasks
 
-
-@router.post("/{case_id}")
-async def create_task(
-    case_id: str,
-    data: TaskCreate,
-    db: firestore.Client = Depends(get_db),
-    user: dict = Depends(get_current_user)
-):
-    """Create a new task under a case."""
-    case_ref = _get_case_ref(db, case_id, user["uid"])
-
-    now = datetime.utcnow()
-    task_dict = {
-        "case_id": case_id,
-        "title": data.title,
-        "description": data.description,
-        "type": data.type,
-        "status": data.status,
-        "action_label": data.actionLabel,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-    doc_ref = case_ref.collection(TASKS_SUBCOLLECTION).document()
-    doc_ref.set(task_dict)
-
-    return _task_response(doc_ref.id, task_dict, case_id)
-
-
-@router.put("/{case_id}/{task_id}")
+@router.put("/{task_id}")
 async def update_task(
-    case_id: str,
-    task_id: str,
-    data: TaskStatusUpdate,
+    task_id: str, 
+    data: dict,
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    """Update a task's status."""
-    case_ref = _get_case_ref(db, case_id, user["uid"])
-    task_ref = case_ref.collection(TASKS_SUBCOLLECTION).document(task_id)
-    task_doc = task_ref.get()
-
-    if not task_doc.exists:
+    tasks_query = db.collection_group(InvestigationTask.SUBCOLLECTION).where(firestore.FieldPath.document_id(), "==", task_id).stream()
+    
+    task_doc = None
+    for doc in tasks_query:
+        task_doc = doc
+        break
+        
+    if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
+        
+    task_doc.reference.update({"status": data.get("status", "completed")})
+    return {"id": task_id, "status": data.get("status", "completed")}
 
-    update_fields = {"status": data.status, "updated_at": datetime.utcnow()}
-    if data.status == "completed":
-        update_fields["completed_at"] = datetime.utcnow()
+async def parse_submitted_file(url: str) -> dict:
+    """Downloads the file from the URL and parses it for Gemini."""
+    try:
+        # 1. Download file to memory (bypasses most 403/400 errors)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        async with httpx.AsyncClient(follow_redirects=True, headers=headers) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            file_bytes = resp.content
+            content_type = resp.headers.get("Content-Type", "").lower()
+            
+        url_lower = url.lower()
 
-    task_ref.update(update_fields)
+        # 2. Handle Images -> Convert to Base64
+        if "image" in content_type or any(ext in url_lower for ext in [".jpg", ".jpeg", ".png", ".webp"]):
+            b64_encoded = base64.b64encode(file_bytes).decode('utf-8')
+            mime = content_type if "image" in content_type else "image/jpeg"
+            return {
+                "type": "image_url", 
+                "image_url": {"url": f"data:{mime};base64,{b64_encoded}"}
+            }
 
-    updated = task_ref.get().to_dict()
-    return _task_response(task_id, updated, case_id)
+        # 3. Handle PDFs -> Extract Text
+        elif "pdf" in content_type or ".pdf" in url_lower:
+            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+            text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
+            return {
+                "type": "text", 
+                "text": f"[Extracted Text from Uploaded PDF Document]:\n{text[:15000]}" # Limit to 15k chars to be safe
+            }
 
+        # 4. Handle Spreadsheets (CSV/Excel) -> Extract Text
+        elif "csv" in content_type or "excel" in content_type or "spreadsheet" in content_type or any(ext in url_lower for ext in [".csv", ".xlsx", ".xls"]):
+            if ".csv" in url_lower or "csv" in content_type:
+                df = pd.read_csv(io.BytesIO(file_bytes))
+            else:
+                df = pd.read_excel(io.BytesIO(file_bytes))
+            text = df.to_string(index=False)
+            return {
+                "type": "text", 
+                "text": f"[Extracted Data from Uploaded Spreadsheet]:\n{text[:15000]}"
+            }
 
-@router.delete("/{case_id}/{task_id}")
-async def delete_task(
-    case_id: str,
-    task_id: str,
-    db: firestore.Client = Depends(get_db),
-    user: dict = Depends(get_current_user)
-):
-    """Delete a task."""
-    case_ref = _get_case_ref(db, case_id, user["uid"])
-    task_ref = case_ref.collection(TASKS_SUBCOLLECTION).document(task_id)
-    task_doc = task_ref.get()
+        # 5. Fallback for unknown files
+        return {"type": "text", "text": f"User submitted a file here: {url}"}
 
-    if not task_doc.exists:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    task_ref.delete()
-    return {"status": "success"}
-
-
-# ────────────────────────────────────────────────────────────────
-# Convenience shortcuts (kept for backward compat with frontend)
-# ────────────────────────────────────────────────────────────────
-
-@router.get("/{case_id}/tasks")
-async def list_tasks_compat(
-    case_id: str,
-    db: firestore.Client = Depends(get_db),
-    user: dict = Depends(get_current_user)
-):
-    """Backward-compatible alias: GET /tasks/{case_id}/tasks → same as GET /tasks/{case_id}."""
-    return await list_tasks(case_id, db, user)
+    except Exception as e:
+        print(f"File Parse Error: {e}")
+        return {"type": "text", "text": f"User submitted a file, but the system could not read it. URL: {url}"}
 
 
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: str,
-    data: dict,           # add data param to receive submitted_value + case_id
+    data: dict,           
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    tasks_query = db.collection_group(
-        InvestigationTask.SUBCOLLECTION
-    ).where(firestore.FieldPath.document_id(), "==", task_id).stream()
-
-    task_doc = None
-    for doc in tasks_query:
-        task_doc = doc
-        break
-
-
+    # ... (Keep your existing Firebase task fetching logic) ...
+    tasks_query = db.collection_group(InvestigationTask.SUBCOLLECTION).where(firestore.FieldPath.document_id(), "==", task_id).stream()
+    task_doc = next(tasks_query, None)
     if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    submitted_value = data.get("submitted_value")
+    submitted_value = data.get("submitted_value", "")
     task_doc.reference.update({
         "status": "completed",
         "submitted_value": submitted_value,
     })
 
-    # ── Re-trigger agent now that user submitted evidence ──
     case_id = data.get("case_id")
     if case_id:
         from app.ai.orchestrator import run_agent_turn
@@ -193,15 +142,27 @@ async def complete_task(
             messages=case_data.get("ai_messages", []),
         )
 
-        # Tell the agent what the user submitted
-        import json
-        ai_case.messages.append({
-            "role": "user",
-            "content": json.dumps({
-                "task_completed": task_id,
-                "submitted_value": submitted_value,
+        # ── THE NEW UNIVERSAL FILE LOGIC ──
+        if isinstance(submitted_value, str) and submitted_value.startswith("http"):
+            # Download and parse the file!
+            parsed_content = await parse_submitted_file(submitted_value)
+            
+            ai_case.messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"Task completed: '{task_doc.to_dict().get('title')}'. Here is the evidence:"},
+                    parsed_content
+                ]
             })
-        })
+        else:
+            # Standard Text format
+            ai_case.messages.append({
+                "role": "user",
+                "content": json.dumps({
+                    "task_completed": task_doc.to_dict().get("title", task_id),
+                    "submitted_value": submitted_value,
+                })
+            })
 
         updated_case, _ = await run_agent_turn(ai_case)
 
@@ -214,30 +175,21 @@ async def complete_task(
 
     return {"status": "success", "task_id": task_id}
 
-
 @router.post("/{task_id}/skip")
 async def skip_task(
     task_id: str,
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    """Mark a task as skipped (legacy convenience endpoint)."""
-    tasks_query = (
-        db.collection_group(TASKS_SUBCOLLECTION)
-        .where(firestore.FieldPath.document_id(), "==", task_id)
-        .stream()
-    )
-
+    tasks_query = db.collection_group(InvestigationTask.SUBCOLLECTION).where(firestore.FieldPath.document_id(), "==", task_id).stream()
+    
     task_doc = None
     for doc in tasks_query:
         task_doc = doc
         break
-
+        
     if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    task_doc.reference.update({
-        "status": "skipped",
-        "updated_at": datetime.utcnow(),
-    })
+        
+    task_doc.reference.update({"status": "skipped"})
     return {"status": "success"}

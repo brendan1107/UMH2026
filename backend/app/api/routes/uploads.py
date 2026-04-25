@@ -237,7 +237,12 @@ async def delete_upload(
     doc = upload_ref.get()
 
     if not doc.exists:
-        raise HTTPException(status_code=404, detail="Upload not found")
+        logger.info(
+            "Upload delete requested for already-deleted upload: case_id=%s upload_id=%s",
+            case_id,
+            upload_id,
+        )
+        return {"status": "success", "alreadyDeleted": True}
 
     data = doc.to_dict()
     storage_path = data.get("storagePath") or data.get("storage_path")

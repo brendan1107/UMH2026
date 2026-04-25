@@ -16,11 +16,11 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
   const [sessionType, setSessionType] = useState<"new" | "existing">("new");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  
+
   // File state
   const [images, setImages] = useState<File[]>([]);
   const [documents, setDocuments] = useState<File[]>([]);
-  
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,12 +35,12 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
       const newCase = await casesService.createCase({
         title: "New Investigation", // You could derive this or let them name it later
         description: description,
-        mode: sessionType,
+        stage: sessionType,
       });
 
       setIsSubmitting(false);
       setIsSuccess(true);
-      
+
       // Upload any initial files if they exist
       if (images.length > 0 || documents.length > 0) {
         try {
@@ -117,10 +117,10 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                       </label>
                       <div className="grid grid-cols-2 gap-4">
                         <label className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none ${sessionType === 'new' ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-300'}`}>
-                          <input 
-                            type="radio" 
-                            name="sessionType" 
-                            value="new" 
+                          <input
+                            type="radio"
+                            name="sessionType"
+                            value="new"
                             className="sr-only"
                             checked={sessionType === 'new'}
                             onChange={() => setSessionType('new')}
@@ -137,10 +137,10 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                           </svg>
                         </label>
                         <label className={`relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none ${sessionType === 'existing' ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-300'}`}>
-                          <input 
-                            type="radio" 
-                            name="sessionType" 
-                            value="existing" 
+                          <input
+                            type="radio"
+                            name="sessionType"
+                            value="existing"
                             className="sr-only"
                             checked={sessionType === 'existing'}
                             onChange={() => setSessionType('existing')}
@@ -180,9 +180,8 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                         onClick={() => imageInputRef.current?.click()}
                         className="relative border border-dashed border-slate-300 rounded-lg p-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 hover:border-slate-400 active:bg-slate-200 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border shadow-sm transition-colors ${
-                          images.length > 0 ? "bg-green-50 border-green-200 text-green-600" : "bg-white border-slate-200 text-slate-500"
-                        }`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border shadow-sm transition-colors ${images.length > 0 ? "bg-green-50 border-green-200 text-green-600" : "bg-white border-slate-200 text-slate-500"
+                          }`}>
                           {images.length > 0 ? (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -197,13 +196,13 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                         <span className="text-xs text-slate-500 mt-1 text-center">
                           {images.length > 0 ? `${images.length} file(s) selected` : "Menus, layout, location"}
                         </span>
-                        <input 
-                          type="file" 
-                          ref={imageInputRef} 
-                          onChange={handleImageChange} 
-                          accept="image/*" 
-                          multiple 
-                          className="hidden" 
+                        <input
+                          type="file"
+                          ref={imageInputRef}
+                          onChange={handleImageChange}
+                          accept="image/*"
+                          multiple
+                          className="hidden"
                         />
                       </button>
 
@@ -213,9 +212,8 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                         onClick={() => documentInputRef.current?.click()}
                         className="relative border border-dashed border-slate-300 rounded-lg p-4 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 hover:border-slate-400 active:bg-slate-200 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border shadow-sm transition-colors ${
-                          documents.length > 0 ? "bg-green-50 border-green-200 text-green-600" : "bg-white border-slate-200 text-slate-500"
-                        }`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border shadow-sm transition-colors ${documents.length > 0 ? "bg-green-50 border-green-200 text-green-600" : "bg-white border-slate-200 text-slate-500"
+                          }`}>
                           {documents.length > 0 ? (
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -230,13 +228,13 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
                         <span className="text-xs text-slate-500 mt-1 text-center">
                           {documents.length > 0 ? `${documents.length} file(s) selected` : "Financials, business plans"}
                         </span>
-                        <input 
-                          type="file" 
-                          ref={documentInputRef} 
-                          onChange={handleDocumentChange} 
-                          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" 
-                          multiple 
-                          className="hidden" 
+                        <input
+                          type="file"
+                          ref={documentInputRef}
+                          onChange={handleDocumentChange}
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+                          multiple
+                          className="hidden"
                         />
                       </button>
                     </div>

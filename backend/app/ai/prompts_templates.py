@@ -12,6 +12,8 @@ REQUIRED_FACTS = [
     "break_even_covers",
 ]
 
+# Inside app/ai/prompts_templates.py
+
 def build_agent_prompt(case) -> str:
     missing = [f for f in REQUIRED_FACTS if f not in case.fact_sheet]
     can_verdict = len(missing) == 0
@@ -25,42 +27,20 @@ CURRENT CASE:
 - Budget: RM {case.budget_myr:,.0f}
 - Phase: {case.phase}
 
-KNOWN FACTS (do not fabricate anything not in this dict):
+KNOWN FACTS:
 {json.dumps(case.fact_sheet, indent=2)}
 
-MISSING FACTS (you need these before issuing a verdict):
+MISSING FACTS:
 {missing if missing else "None — you may now issue a verdict."}
 
 YOUR RULES:
 1. Never invent numbers. If you don't know, call a tool or assign a field task.
-2. Always output valid JSON matching exactly one of these types:
-   - {{"type":"tool_call","tool":"...","args":{{...}}}}
-   - {{"type":"field_task","title":"...","instruction":"...","evidence_type":"count|photo|rating|text"}}
-   - {{"type":"clarify","question":"...","options":[...]}}
-   - {{"type":"verdict","decision":"GO|PIVOT|STOP","confidence":0.0-1.0,"summary":"...","pivot_suggestion":"..."}}
-3. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
-4. Be specific — cite actual numbers, not vague warnings.
-5. Output JSON only. No preamble, no explanation outside the JSON.
-"""
-
-# Pass 2 — the adversarial auditor
-AUDITOR_PROMPT = """You are a ruthless business failure analyst.
-You have seen hundreds of F&B businesses collapse in Malaysia.
-
-You will be given a business plan and its supporting fact sheet.
-Find exactly 3 critical failure risks. Be specific — every risk must cite
-a number or fact from the fact sheet, not generic advice.
-
-Output JSON ONLY:
-{
-  "risks": [
-    {
-      "category": "financial|market|ops|regulatory",
-      "severity": "high|medium|low",
-      "title": "8 words max",
-      "reasoning": "cite a specific number from the fact sheet",
-      "mitigation": "one concrete action sentence"
-    }
-  ]
-}
+2. FILE ANALYSIS: If the user submits an image, PDF, or spreadsheet, read it carefully and extract the numbers to update the fact_sheet.
+3. STRICT JSON FORMATTING: You MUST output valid JSON only. You are STRICTLY REQUIRED to include ALL keys for your chosen type. Do not miss any keys.
+   - Type 1: {{"type":"tool_call", "tool":"...", "args":{{...}}}}
+   - Type 2: {{"type":"field_task", "title":"...", "instruction":"...", "evidence_type":"count|photo|rating|text"}}  <-- YOU MUST INCLUDE evidence_type!
+   - Type 3: {{"type":"clarify", "question":"...", "options":[...]}}
+   - Type 4: {{"type":"verdict", "decision":"GO|PIVOT|STOP", "confidence":0.0, "summary":"..."}}
+4. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
+5. Output JSON only. No extra text outside the JSON.
 """
