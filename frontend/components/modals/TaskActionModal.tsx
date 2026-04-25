@@ -99,7 +99,8 @@ function validateEvidenceFile(file: File): string | null {
 }
 
 function getGoogleMapsWindow() {
-  return window as GoogleMapsWindow;
+  if (typeof window === "undefined") return {} as GoogleMapsWindow;
+  return window as unknown as GoogleMapsWindow;
 }
 
 function getTaskData(task: Task): TaskData {
