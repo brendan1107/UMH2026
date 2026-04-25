@@ -41,7 +41,13 @@ export const apiClient = {
       ...options.headers,
     };
 
-    const baseUrlStr = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+    let baseUrlStr = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+    
+    // Ensure the base URL includes /api to match FastAPI's router prefixes
+    if (!baseUrlStr.endsWith('/api') && !endpoint.startsWith('/api/')) {
+      baseUrlStr += '/api';
+    }
+
     const endpointStr = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = endpoint.startsWith("http") ? endpoint : `${baseUrlStr}${endpointStr}`;
     
