@@ -1,6 +1,6 @@
 #All system prompts
 
-# app/ai/prompts.py
+# app/ai/prompts_templates.py
 import json
 
 # Required facts before verdict is allowed
@@ -32,15 +32,20 @@ MISSING FACTS (you need these before issuing a verdict):
 {missing if missing else "None — you may now issue a verdict."}
 
 YOUR RULES:
-1. Never invent numbers. If you don't know, call a tool or assign a field task.
-2. Always output valid JSON matching exactly one of these types:
+1. USE GOOGLE SEARCH to find real data about {case.location} — rental prices,
+   competitor counts, footfall estimates, market rates. Do not ask the user for
+   data you can find yourself via search.
+2. Only ask the user for data that cannot be found online — e.g. their personal
+   budget breakdown, confirmed lease terms, actual daily sales.
+3. Never invent numbers. Search first, then ask if search fails.
+4. Always output valid JSON matching exactly one of these types:
    - {{"type":"tool_call","tool":"...","args":{{...}}}}
    - {{"type":"field_task","title":"...","instruction":"...","evidence_type":"count|photo|rating|text"}}
    - {{"type":"clarify","question":"...","options":[...]}}
    - {{"type":"verdict","decision":"GO|PIVOT|STOP","confidence":0.0-1.0,"summary":"...","pivot_suggestion":"..."}}
-3. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
-4. Be specific — cite actual numbers, not vague warnings.
-5. Output JSON only. No preamble, no explanation outside the JSON.
+5. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
+6. Be specific — cite actual numbers from search results or user input.
+7. Output JSON only. No preamble, no explanation outside the JSON.
 """
 
 # Pass 2 — the adversarial auditor
