@@ -30,7 +30,7 @@ Registers all route modules and middleware.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, cases, chat, tasks, uploads, reports, calendar
+from app.api.routes import auth, cases, chat, tasks, uploads, reports, calendar, locations
 from app.config import settings
 
 def create_app() -> FastAPI:
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(uploads.router, prefix="/api/uploads", tags=["Evidence Uploads"])
     app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
     app.include_router(calendar.router, prefix="/api/calendar", tags=["Google Calendar"])
+    app.include_router(locations.router, prefix="/api/locations", tags=["Locations"])
 
     @app.get("/health")
     async def health_check():

@@ -19,16 +19,21 @@ Replaces SQLAlchemy/PostgreSQL — Firestore is a NoSQL document database.
 # parts of the application without having to repeat the initialization code. This 
 # promotes code reuse and keeps our database access organized.
 
+import logging
 from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
-from app.config import settings
+from app.config import BACKEND_DIR, settings
+
+logger = logging.getLogger(__name__)
 
 firebase_initialization_error: Exception | None = None
 
 credential_path = Path(settings.FIREBASE_CREDENTIALS_PATH)
+if not credential_path.is_absolute():
+    credential_path = BACKEND_DIR / credential_path
 db = None
 bucket = None
 
@@ -43,20 +48,31 @@ if credential_path.exists():
 
         # Firestore client
         db = firestore.client()
+        logger.info("Firestore client initialized successfully.")
 
         # Storage bucket
         if settings.FIREBASE_STORAGE_BUCKET:
             bucket = storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+            logger.info(
+                "Firebase Storage bucket initialized: %s",
+                settings.FIREBASE_STORAGE_BUCKET,
+            )
         else:
-            firebase_initialization_error = ValueError(
-                "FIREBASE_STORAGE_BUCKET is not configured. Set it in "
-                "backend/.env or backend/.env.backend."
+            logger.warning(
+                "FIREBASE_STORAGE_BUCKET is not configured. "
+                "Uploads will use metadata-only fallback."
             )
     except Exception as exc:
         firebase_initialization_error = exc
         db = None
         bucket = None
+        logger.error("Firebase initialization failed: %s", exc)
 else:
     firebase_initialization_error = FileNotFoundError(
         f"Firebase credentials file not found: {credential_path}"
+    )
+    logger.warning(
+        "Firebase credentials file not found at '%s'. "
+        "Using local fallback mode (no Firestore/Storage).",
+        credential_path,
     )

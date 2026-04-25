@@ -1,5 +1,12 @@
 # app/api/routes/reports.py
 
+"""
+Reports Routes
+
+Handles report generation, retrieval, and PDF export for business cases.
+Reports/recommendations are stored in Firestore:
+  business_cases/{case_id}/recommendations/{rec_id}
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from google.cloud import firestore
@@ -9,12 +16,25 @@ from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.business_case import BusinessCase
 from app.models.recommendation import Recommendation
+from app.utils.helpers import snake_dict_to_camel
 
 # ── AI imports ──
 from app.ai.review_layer import run_audit
 from app.ai.schemas import BusinessCase as AICase
 
 router = APIRouter()
+
+
+def _get_case_ref(db, case_id: str, user_uid: str):
+    """Verify case exists and belongs to user."""
+    case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+    case_doc = case_ref.get()
+    if not case_doc.exists:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if case_doc.to_dict().get("user_id") != user_uid:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return case_ref
+
 
 @router.get("/{case_id}/report")
 async def get_report(
@@ -28,12 +48,11 @@ async def get_report(
     
     latest_rec = None
     for doc in rec_ref:
-        latest_rec = doc.to_dict()
-        break
-        
-    if latest_rec:
-        return latest_rec
-        
+        data = doc.to_dict()
+        data["id"] = doc.id
+        return snake_dict_to_camel(data)
+
+    # No report found yet — return a "gathering" status
     return {
         "status": "pending",
         "summary": "No report generated yet. Please complete the investigation.",
@@ -87,7 +106,7 @@ async def export_report_pdf(
     )
 
 
-@router.post("/{case_id}/verdict")
+@router.post("/{case_id}/final-verdict")
 async def generate_verdict(
     case_id: str,
     db: firestore.Client = Depends(get_db),

@@ -58,6 +58,12 @@ export interface EvidenceUpload {
   name: string;
   size: string;
   type: "image" | "document";
+  caseId?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  storagePath?: string;
+  storageMode?: "firebase_storage" | "metadata_only";
   url: string;
   createdAt: string;
 }

@@ -12,14 +12,51 @@ export interface UploadedFile {
 interface UploadPanelProps {
   files: UploadedFile[];
   onFileUpload: (file: File) => void;
+  onFileDelete: (fileId: string) => void;
 }
 
-export default function UploadPanel({ files, onFileUpload }: UploadPanelProps) {
+const BLOCKED_PATTERNS = [
+  "firebase-service-account",
+  "service-account",
+  ".env",
+  "env.backend",
+  "credentials.json",
+];
+
+const BLOCKED_EXTENSIONS = [".pem", ".key", ".p12", ".pfx"];
+
+const ALLOWED_EXTENSIONS = [
+  ".png", ".jpg", ".jpeg", ".webp",
+  ".pdf", ".doc", ".docx", ".ppt", ".pptx",
+  ".csv", ".xls", ".xlsx"
+];
+
+export default function UploadPanel({ files, onFileUpload, onFileDelete }: UploadPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const validateFile = (file: File): boolean => {
+    const filename = file.name.toLowerCase();
+    
+    if (BLOCKED_PATTERNS.some(pattern => filename.includes(pattern)) || 
+        BLOCKED_EXTENSIONS.some(ext => filename.endsWith(ext))) {
+      alert("Sensitive configuration or credential files cannot be uploaded as evidence.");
+      return false;
+    }
+
+    if (!ALLOWED_EXTENSIONS.some(ext => filename.endsWith(ext))) {
+      alert(`Unsupported file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      return false;
+    }
+
+    return true;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileUpload(e.target.files[0]);
+      const file = e.target.files[0];
+      if (validateFile(file)) {
+        onFileUpload(file);
+      }
       // Reset input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -53,7 +90,11 @@ export default function UploadPanel({ files, onFileUpload }: UploadPanelProps) {
                 <p className="text-xs text-slate-400 ">{file.size}</p>
               </div>
             </div>
-            <button className="text-slate-400  hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1">
+            <button 
+              onClick={() => onFileDelete(file.id)}
+              className="text-slate-400  hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+              title="Delete file"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>

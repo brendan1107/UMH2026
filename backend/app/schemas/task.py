@@ -5,6 +5,20 @@ from typing import Optional
 from datetime import datetime
 
 
+class TaskCreate(BaseModel):
+    """Schema for creating a new task under a case."""
+    title: str
+    description: Optional[str] = None
+    type: str = "answer_questions"
+    status: str = "pending"
+    actionLabel: Optional[str] = None
+
+
+class TaskStatusUpdate(BaseModel):
+    """Schema for updating a task's status."""
+    status: str  # pending | completed | skipped | scheduled
+
+
 class TaskResponse(BaseModel):
     id: str
     title: str

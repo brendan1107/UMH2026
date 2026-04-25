@@ -1,4 +1,12 @@
 # app/api/routes/chat.py
+"""
+Chat Sessions Routes
+
+Handles chat sessions and messages for business cases.
+Messages are stored in Firestore subcollections:
+  business_cases/{case_id}/chat_sessions/{session_id}
+  business_cases/{case_id}/chat_sessions/{session_id}/messages/{msg_id}
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from google.cloud import firestore
 from datetime import datetime
@@ -7,6 +15,7 @@ from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.business_case import BusinessCase
 from app.models.chat import ChatSession, ChatMessage
+from app.utils.helpers import snake_dict_to_camel
 
 # ──  AI imports ──
 from app.ai.orchestrator import run_agent_turn
@@ -14,24 +23,27 @@ from app.ai.schemas import BusinessCase as AICase
 
 router = APIRouter()
 
+
 @router.post("/{case_id}/sessions")
 async def create_session(
     case_id: str,
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
+    """Create a new chat session for a case."""
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     if not case_ref.get().exists:
         raise HTTPException(status_code=404, detail="Case not found")
 
     session = ChatSession(case_id=case_id)
     session_dict = session.to_dict()
-    
+
     doc_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document()
     doc_ref.set(session_dict)
-    
+
     session_dict["id"] = doc_ref.id
-    return session_dict
+    return snake_dict_to_camel(session_dict)
+
 
 @router.get("/{case_id}/sessions")
 async def list_sessions(
@@ -39,15 +51,16 @@ async def list_sessions(
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
+    """List all chat sessions for a case."""
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     sessions_ref = case_ref.collection(ChatSession.SUBCOLLECTION).stream()
-    
+
     sessions = []
     for doc in sessions_ref:
         data = doc.to_dict()
         data["id"] = doc.id
-        sessions.append(data)
-        
+        sessions.append(snake_dict_to_camel(data))
+
     return sessions
 
 # keep create_session, list_sessions, get_messages unchanged 
@@ -63,6 +76,7 @@ async def send_message(
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
+    """Send a message in a chat session. Stores user message and AI response."""
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(session_id)
 
@@ -111,19 +125,39 @@ async def send_message(
 
     # 7. Save AI output as a chat message
     ai_content = _format_output_for_chat(ai_output)
+
+    # Store AI response (placeholder for basic CRUD integration)
     ai_msg = ChatMessage(
         session_id=session_id,
         role="assistant",
         content=ai_content
     )
     ai_msg_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).document()
+
     ai_dict = ai_msg.to_dict()
     ai_dict["ai_output_type"] = ai_output.type   # so frontend knows what to render
     ai_dict["ai_output_data"] = ai_output.model_dump()
     ai_msg_ref.set(ai_dict)
 
+
     ai_dict["id"] = ai_msg_ref.id
-    return ai_dict
+    return snake_dict_to_camel(ai_dict)
+
+
+
+def _format_output_for_chat(output) -> str:
+    """Convert AI output to human-readable string for simple display."""
+    if output.type == "tool_call":
+        return f"Investigating {output.tool.replace('_', ' ')}..."
+    elif output.type == "field_task":
+        return f"Mission: {output.title}\n\n{output.instruction}"
+    elif output.type == "clarify":
+        return output.question
+    elif output.type == "verdict":
+        return f"VERDICT: {output.decision}\n\n{output.summary}"
+    return ""
+
+
 
 
 def _format_output_for_chat(output) -> str:
@@ -142,19 +176,20 @@ def _format_output_for_chat(output) -> str:
 
 @router.get("/{case_id}/sessions/{session_id}/messages")
 async def get_messages(
-    case_id: str, 
+    case_id: str,
     session_id: str,
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
+    """Get all messages in a chat session."""
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(session_id)
     messages_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).order_by("created_at").stream()
-    
+
     messages = []
     for doc in messages_ref:
         data = doc.to_dict()
         data["id"] = doc.id
-        messages.append(data)
-        
+        messages.append(snake_dict_to_camel(data))
+
     return messages

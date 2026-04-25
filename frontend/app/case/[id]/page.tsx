@@ -22,8 +22,19 @@ import {
   uploadsService, 
   verdictService,
   ChatMessage,
-  BusinessCase
+  BusinessCase,
+  EvidenceUpload
 } from "../../../lib/api";
+
+const toStoredUploadedFiles = (uploads: EvidenceUpload[]): UploadedFile[] =>
+  uploads
+    .filter((upload) => Boolean(upload.storagePath))
+    .map((upload) => ({
+      id: upload.id,
+      name: upload.name || upload.fileName || "Uploaded file",
+      size: upload.size,
+      type: upload.type
+    }));
 
 export default function CaseWorkspace() {
   const params = useParams();
@@ -49,6 +60,9 @@ export default function CaseWorkspace() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isEndSessionModalOpen, setIsEndSessionModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Staged tasks state
+  const [stagedTaskActions, setStagedTaskActions] = useState<Record<string, any>>({});
 
   const currentUser = auth.currentUser;
 
@@ -64,17 +78,18 @@ export default function CaseWorkspace() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [caseData, messagesData, tasksData] = await Promise.all([
+        const [caseData, messagesData, tasksData, uploadsData] = await Promise.all([
           casesService.getCaseById(id),
           chatService.getMessages(id, "default_session"),
-          tasksService.getTasks(id)
+          tasksService.getTasks(id),
+          uploadsService.listUploads(id)
         ]);
 
         setCaseDetails(caseData);
         setSessionStatus(caseData.status as any);
         setMessages(messagesData);
-        // Map backend tasks to frontend Task format if necessary
         setTasks(tasksData as any);
+        setFiles(toStoredUploadedFiles(uploadsData));
 
         try {
           const recData = await reportsService.getLatestRecommendation(id);
@@ -130,29 +145,52 @@ export default function CaseWorkspace() {
   const handleTaskActionSubmit = async (taskId: string, actionData: any) => {
     setIsTaskModalOpen(false);
     
-    try {
-      // 1. Mark task as completed on backend
-      await tasksService.updateTask(taskId, "completed");
-      handleTaskUpdate(taskId, "completed");
-      
-      // 2. Generate a user message based on the action
-      let content = "I've completed the task.";
-      if (activeTask?.type === "choose_option") {
-        const option = activeTask.data?.options?.find((o: any) => o.id === actionData.selectedOption);
-        content = `I have selected the option: ${option?.title || actionData.selectedOption}.`;
-      } else if (activeTask?.type === "answer_questions") {
-        content = "I have provided the requested details in the form.";
-      } else if (activeTask?.type === "provide_text_input") {
-        content = `Here is my input: ${actionData.text}`;
-      }
-
-      // 3. Send message
-      await handleSendMessage(content);
-    } catch (error) {
-      console.error("Failed to submit task action", error);
-    }
+    // Save the action locally
+    setStagedTaskActions(prev => ({ ...prev, [taskId]: actionData }));
     
+    // Optimistically mark as completed in UI
+    handleTaskUpdate(taskId, "completed");
     setActiveTask(null);
+  };
+
+  const handleSubmitAllTasks = async () => {
+    const tasksToSubmit = Object.entries(stagedTaskActions);
+    if (tasksToSubmit.length === 0) return;
+
+    try {
+      let contents = [];
+      for (const [taskId, actionData] of tasksToSubmit) {
+        // Mark task as completed on backend
+        await tasksService.updateTask(taskId, "completed");
+        
+        const task = tasks.find(t => t.id === taskId);
+        let content = `I've completed the task: ${task?.title || taskId}.`;
+        
+        if (task?.type === "choose_option") {
+          const option = task.data?.options?.find((o: any) => o.id === actionData.selectedOption);
+          content += `\nSelected option: ${option?.title || actionData.selectedOption}.`;
+        } else if (task?.type === "answer_questions") {
+          content += "\nProvided details:\n";
+          for (const [qId, ans] of Object.entries(actionData.answers || {})) {
+            const q = task.data?.questions?.find((q: any) => q.id === qId);
+            content += `- ${q?.label || qId}: ${ans}\n`;
+          }
+        } else if (task?.type === "provide_text_input") {
+          content += `\nInput: ${actionData.text}`;
+        } else if (task?.type === "select_location") {
+          content += `\nSelected location: ${actionData.location?.address} (${actionData.location?.lat}, ${actionData.location?.lng})`;
+        } else if (task?.type === "schedule_event") {
+          content += `\nScheduled event for: ${actionData.eventDate}`;
+        }
+        contents.push(content);
+      }
+      
+      const finalContent = contents.join("\n\n");
+      await handleSendMessage(finalContent);
+      setStagedTaskActions({});
+    } catch (error) {
+      console.error("Failed to submit staged tasks", error);
+    }
   };
 
   const handleGenerateVerdict = async () => {
@@ -211,14 +249,12 @@ export default function CaseWorkspace() {
   const handleFileUpload = async (file: File) => {
     try {
       const uploaded = await uploadsService.uploadFile(id, file);
-      const newFile: UploadedFile = {
-        id: uploaded.id,
-        name: uploaded.name,
-        size: uploaded.size,
-        type: uploaded.type
-      };
-      
-      setFiles((prev) => [...prev, newFile]);
+      if (uploaded.storageMode !== "firebase_storage" || !uploaded.storagePath) {
+        throw new Error("Upload did not complete in Firebase Storage.");
+      }
+
+      const uploadsData = await uploadsService.listUploads(id);
+      setFiles(toStoredUploadedFiles(uploadsData));
 
       // Automatically complete "Upload floor plan" task if it exists and is pending
       const uploadTask = tasks.find(t => t.type === "upload_file" && t.status === "pending");
@@ -229,6 +265,17 @@ export default function CaseWorkspace() {
       }
     } catch (error) {
       console.error("Failed to upload file", error);
+      alert("Failed to upload file to Firebase Storage. Please try again.");
+    }
+  };
+
+  const handleFileDelete = async (fileId: string) => {
+    try {
+      await uploadsService.deleteUpload(id, fileId);
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    } catch (error) {
+      console.error("Failed to delete file", error);
+      alert("Failed to delete file. Please try again.");
     }
   };
 
@@ -257,8 +304,25 @@ export default function CaseWorkspace() {
           }} 
           onTaskAction={handleTaskActionClick} 
         />
+        {Object.keys(stagedTaskActions).length > 0 && (
+          <div className="px-4 pb-4">
+            <button 
+              onClick={handleSubmitAllTasks}
+              className="w-full py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 shadow-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <span>Submit All Completed Tasks</span>
+              <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">
+                {Object.keys(stagedTaskActions).length}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
-      <UploadPanel files={files} onFileUpload={handleFileUpload} />
+      <UploadPanel
+        files={files}
+        onFileUpload={handleFileUpload}
+        onFileDelete={handleFileDelete}
+      />
     </div>
   );
 
@@ -293,7 +357,11 @@ export default function CaseWorkspace() {
         
         {/* Input Area */}
         <div className="shrink-0">
-          <ChatInput onSendMessage={handleSendMessage} disabled={sessionStatus === "archived"} />
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleFileUpload}
+            disabled={sessionStatus === "archived"}
+          />
         </div>
       </div>
       <TaskActionModal 
