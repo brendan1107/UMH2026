@@ -8,13 +8,11 @@ from app.ai.state import next_phase, apply_tool_result
 
 MAX_TOOL_DEPTH = 5
 AGENT_HISTORY_LIMIT = 12
-AGENT_MAX_TOKENS = 900
 
 
 def _recent_messages(messages: list[dict], limit: int = AGENT_HISTORY_LIMIT) -> list[dict]:
     """Keep chat calls small; fact_sheet is the long-term memory."""
     return messages[-limit:] if len(messages) > limit else messages
-
 
 async def run_agent_turn(
     case: BusinessCase,
@@ -36,8 +34,8 @@ async def run_agent_turn(
     output = await glm_call(
         messages=messages,
         system=system,
+        case=case,
         timeout=timeout,
-        max_tokens=AGENT_MAX_TOKENS,
     )
 
     case.messages.append({

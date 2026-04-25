@@ -31,10 +31,16 @@ class BusinessCase:
     # ai_phase: current phase of the ReAct investigation loop (INTAKE → VERDICT)
     # fact_sheet: grows as tools return data and user submits evidence
     # ai_messages: full GLM conversation history, persisted across turns
-    budget_myr: float = 30000.0
+    budget_myr: Optional[float] = None
     ai_phase: str = "INTAKE"
     fact_sheet: dict = field(default_factory=dict)
     ai_messages: list = field(default_factory=list)
+
+    # ── Pending Input State ──────────────────────────────────
+    # tracks if the assistant is waiting for a specific piece of data from the chat
+    pending_input_key: Optional[str] = None
+    pending_input_question: Optional[str] = None
+    pending_input_type: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -52,6 +58,9 @@ class BusinessCase:
             "ai_phase": self.ai_phase,
             "fact_sheet": self.fact_sheet,
             "ai_messages": self.ai_messages,
+            "pending_input_key": self.pending_input_key,
+            "pending_input_question": self.pending_input_question,
+            "pending_input_type": self.pending_input_type,
         }
 
     @staticmethod
@@ -68,10 +77,13 @@ class BusinessCase:
             created_at=data.get("created_at", datetime.utcnow()),
             updated_at=data.get("updated_at", datetime.utcnow()),
             # AI state
-            budget_myr=float(data.get("budget_myr", 30000.0)),
+            budget_myr=float(data.get("budget_myr")) if data.get("budget_myr") else None,
             ai_phase=data.get("ai_phase", "INTAKE"),
             fact_sheet=data.get("fact_sheet", {}),
             ai_messages=data.get("ai_messages", []),
+            pending_input_key=data.get("pending_input_key"),
+            pending_input_question=data.get("pending_input_question"),
+            pending_input_type=data.get("pending_input_type"),
         )
 
     COLLECTION = "business_cases"

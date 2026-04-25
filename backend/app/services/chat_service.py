@@ -59,7 +59,7 @@ class ChatService:
             id=case_id,
             idea=case_doc.get("description", case_doc.get("title", "")),
             location=case_doc.get("target_location", ""),
-            budget_myr=float(case_doc.get("budget_myr", 30000)),
+            budget_myr=float(case_doc.get("budget_myr")) if case_doc.get("budget_myr") else None,
             phase=case_doc.get("ai_phase", "INTAKE"),
             fact_sheet=case_doc.get("fact_sheet", {}),
             messages=case_doc.get("ai_messages", []),

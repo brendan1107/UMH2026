@@ -27,7 +27,7 @@ def next_phase(case: BusinessCase, output: AgentOutput) -> Phase:
 
     if current == "TASK_ASSIGNMENT":
         # Move to evidence collection after tasks are emitted
-        if output.type == "field_task":
+        if output.type == "task_batch":
             return "EVIDENCE"
         return "TASK_ASSIGNMENT"
 

@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import requests
+import pytest
 
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api")
@@ -12,7 +13,7 @@ AUTH_HEADER = {"Authorization": "Bearer dev-token"}
 
 def _require_case_id() -> str:
     if not CASE_ID:
-        raise SystemExit(
+        pytest.skip(
             "Set UPLOAD_TEST_CASE_ID to an existing case owned by dev-user-000. "
             "Run the backend with DEV_AUTH_BYPASS=true for this smoke test."
         )
