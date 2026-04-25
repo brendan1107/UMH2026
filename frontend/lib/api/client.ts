@@ -41,7 +41,9 @@ export const apiClient = {
       ...options.headers,
     };
 
-    const url = endpoint.startsWith("http") ? endpoint : `${BASE_URL}${endpoint}`;
+    const baseUrlStr = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+    const endpointStr = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = endpoint.startsWith("http") ? endpoint : `${baseUrlStr}${endpointStr}`;
     
     const response = await fetch(url, {
       ...options,

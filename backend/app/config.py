@@ -71,6 +71,17 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
     ]
 
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, value):
+        """Allow comma-separated strings for CORS origins from env vars."""
+        if isinstance(value, str):
+            if value.startswith("["):
+                # Let pydantic handle JSON strings
+                return value
+            return [i.strip() for i in value.split(",")]
+        return value
+
     @field_validator("DEBUG", mode="before")
     @classmethod
     def parse_debug(cls, value):
