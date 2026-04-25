@@ -1,6 +1,9 @@
 import { auth } from "../firebase";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  console.warn("NEXT_PUBLIC_API_URL is missing in environment. Falling back to http://127.0.0.1:8000/api");
+}
 
 /**
  * apiClient - Wrapper for fetch that automatically adds Firebase Auth tokens.
@@ -43,18 +46,40 @@ export const apiClient = {
 
     let baseUrlStr = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
     
-    // Ensure the base URL includes /api to match FastAPI's router prefixes
-    if (!baseUrlStr.endsWith('/api') && !endpoint.startsWith('/api/')) {
-      baseUrlStr += '/api';
+    // Normalize endpoint - ensure single leading slash
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+    // Construct final URL
+    let url: string;
+    if (endpoint.startsWith("http")) {
+      url = endpoint;
+    } else {
+      // If endpoint already starts with /api/, we should use the domain part of BASE_URL
+      // to avoid /api/api duplication.
+      if (normalizedEndpoint.startsWith('/api/')) {
+        // Extract domain from BASE_URL (e.g. http://127.0.0.1:8000)
+        const domain = baseUrlStr.replace(/\/api$/, '');
+        url = `${domain}${normalizedEndpoint}`;
+      } else {
+        // Standard case: append normalizedEndpoint to baseUrlStr
+        url = `${baseUrlStr}${normalizedEndpoint}`;
+      }
     }
 
-    const endpointStr = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const url = endpoint.startsWith("http") ? endpoint : `${baseUrlStr}${endpointStr}`;
+    console.log(`[API Request] ${options.method || 'GET'} ${url}`);
     
     const response = await fetch(url, {
       ...options,
       headers,
+    }).catch(err => {
+      console.error(`[API Network Error] ${options.method || 'GET'} ${url}:`, err.message);
+      throw err;
     });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "No error details");
+      console.error(`[API HTTP Error] ${response.status} ${url}: ${errorText}`);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

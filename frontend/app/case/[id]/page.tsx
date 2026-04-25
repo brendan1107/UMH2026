@@ -11,6 +11,7 @@ import RecommendationPanel, { RecommendationData } from "../../../components/rep
 import TaskActionModal from "../../../components/modals/TaskActionModal";
 import EndSessionModal, { FinalInsight } from "../../../components/modals/EndSessionModal";
 import SettingsModal from "../../../components/modals/SettingsModal";
+import LocationAnalysis from "../../../components/locations/LocationAnalysis";
 import { auth } from "../../../lib/firebase";
 
 // API services
@@ -94,6 +95,7 @@ export default function CaseWorkspace() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [caseDetails, setCaseDetails] = useState<BusinessCase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Session Status State
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("active");
@@ -122,42 +124,49 @@ export default function CaseWorkspace() {
     return uploadsData;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [caseData, messagesData, tasksData, uploadsData] = await Promise.all([
+        casesService.getCaseById(id),
+        chatService.getMessages(id, "default_session"),
+        tasksService.getTasks(id),
+        uploadsService.listUploads(id)
+      ]);
+
+      setCaseDetails(caseData);
+      setSessionStatus(toSessionStatus(caseData.status));
+      setMessages(messagesData);
+      setTasks(toTaskListItems(tasksData));
+      setFiles(toStoredUploadedFiles(uploadsData));
+
       try {
-        setIsLoading(true);
-        const [caseData, messagesData, tasksData, uploadsData] = await Promise.all([
-          casesService.getCaseById(id),
-          chatService.getMessages(id, "default_session"),
-          tasksService.getTasks(id),
-          uploadsService.listUploads(id)
-        ]);
-
-        setCaseDetails(caseData);
-        setSessionStatus(toSessionStatus(caseData.status));
-        setMessages(messagesData);
-        setTasks(toTaskListItems(tasksData));
-        setFiles(toStoredUploadedFiles(uploadsData));
-
-        try {
-          const recData = await reportsService.getLatestRecommendation(id);
-          setRecommendation(recData as RecommendationData);
-        } catch {
-          // No recommendation yet
-          setRecommendation({
-            status: "gathering",
-            summary: "Waiting for enough data to generate a recommendation.",
-            strengths: [],
-            risks: []
-          });
-        }
-      } catch (error) {
-        console.error("Failed to load case data:", error);
-      } finally {
-        setIsLoading(false);
+        const recData = await reportsService.getLatestRecommendation(id);
+        setRecommendation(recData as RecommendationData);
+      } catch {
+        // No recommendation yet
+        setRecommendation({
+          status: "gathering",
+          summary: "Waiting for enough data to generate a recommendation.",
+          strengths: [],
+          risks: []
+        });
       }
-    };
+    } catch (err) {
+      console.error("Failed to load case data:", err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("failed to fetch")) {
+        setError("Could not connect to backend. Make sure the backend server is running at http://127.0.0.1:8000.");
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (id) {
       fetchData();
     }
@@ -182,14 +191,7 @@ export default function CaseWorkspace() {
       }
     } catch (error) {
       console.error("Failed to send message", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      const assistantErrorMessage: ChatMessage = {
-        id: `${Date.now()}-send-error`,
-        role: "assistant",
-        content: `I could not reach the backend AI service, so no investigation task was created. ${errorMessage}`,
-        createdAt: new Date().toISOString()
-      };
-      setMessages((prev) => [...prev, assistantErrorMessage]);
+      // Optional: set a transient UI error state here
       setRecommendation((prev) =>
         prev ? { ...prev, status: "gathering" } : prev
       );
@@ -380,6 +382,30 @@ export default function CaseWorkspace() {
     }
   };
 
+  if (error) {
+    return (
+      <AppShell leftSidebar={<div />} rightSidebar={<div />} onSettingsClick={() => setIsSettingsOpen(true)}>
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Connection Failure</h2>
+          <p className="text-slate-500 mb-8 max-w-md mx-auto">
+            {error}
+          </p>
+          <button 
+            onClick={fetchData}
+            className="px-8 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (isLoading) {
     return (
       <AppShell leftSidebar={<div />} rightSidebar={<div />} onSettingsClick={() => setIsSettingsOpen(true)}>
@@ -429,6 +455,27 @@ export default function CaseWorkspace() {
             </button>
           </div>
         )}
+        <div className="p-4 border-t border-slate-100">
+          <LocationAnalysis 
+            caseId={id} 
+            onAnalysisComplete={async (result) => {
+              // Refresh tasks to show newly created suggested tasks
+              await refreshTasks();
+              
+              // Refresh messages to show the analysis confirmation message
+              const messagesData = await chatService.getMessages(id, "default_session");
+              setMessages(messagesData);
+              
+              // Refresh recommendation if summary is available
+              try {
+                const recData = await reportsService.getLatestRecommendation(id);
+                setRecommendation(recData as RecommendationData);
+              } catch (e) {
+                console.error("Failed to refresh recommendation after analysis", e);
+              }
+            }}
+          />
+        </div>
       </div>
       <UploadPanel
         files={files}

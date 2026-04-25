@@ -97,6 +97,10 @@ async def get_case(
     if data.get("user_id") != user["uid"]:
         raise HTTPException(status_code=403, detail="Not authorized to access this case")
 
+    # Ensure welcome message exists for onboarding
+    from app.services.case_service import CaseService
+    await CaseService().ensure_welcome_message(db, case_id)
+
     return _case_response(doc.id, data)
 
 

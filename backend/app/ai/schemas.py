@@ -20,11 +20,23 @@ class ToolCallOutput(BaseModel):
     tool: Literal["fetch_competitors", "estimate_footfall", "calculate_breakeven"]
     args: dict[str, Any]
 
+class TaskOption(BaseModel):
+    id: str
+    title: str
+
+class TaskQuestion(BaseModel):
+    id: str
+    label: str
+
 class FieldTaskOutput(BaseModel):
     type: Literal["field_task"]
     title: str
     instruction: str
-    evidence_type: Literal["count", "photo", "rating", "text"]
+    evidence_type: Literal["count", "photo", "rating", "text", "location", "schedule", "decision", "questions"]
+    options: Optional[list[TaskOption]] = None
+    questions: Optional[list[TaskQuestion]] = None
+    event_title: Optional[str] = None
+    event_duration: Optional[str] = None
 
 class ClarifyOutput(BaseModel):
     type: Literal["clarify"]
@@ -78,3 +90,7 @@ class BusinessCase(BaseModel):
     phase: Phase
     fact_sheet: dict[str, Any]   # grows as tools return data
     messages: list[dict]          # full GLM conversation history
+    market_context: Optional[str] = None
+    tasks: Optional[list[dict[str, Any]]] = None
+    location_analysis: Optional[dict[str, Any]] = None
+    case_inputs: Optional[list[dict[str, Any]]] = None

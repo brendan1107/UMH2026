@@ -69,6 +69,7 @@ export interface InvestigationTask {
   actionLabel?: string;
   data?: Record<string, unknown>;
   source?: string;
+  questions?: string[];
   submittedValue?: TaskActionData;
   completedAt?: string;
   createdAt?: string;
@@ -122,6 +123,70 @@ export interface LocationSuggestion {
   address?: string;
   footTraffic?: string;
   competition?: string;
+}
+
+export interface TargetLocation {
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  placeId?: string;
+  googleMapsUrl?: string;
+  rating?: number;
+  reviewCount?: number;
+}
+
+export interface Competitor {
+  id: string;
+  placeId?: string;
+  name: string;
+  category: string;
+  rating: number;
+  reviewCount: number;
+  address: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number;
+  riskLevel: "Low" | "Medium" | "High";
+  riskScore: number;
+  insight: string;
+  googleMapsUrl?: string;
+}
+
+export interface SuggestedTask {
+  title: string;
+  description: string;
+  type: TaskType;
+  actionLabel: string;
+  questions?: string[];
+}
+
+export interface SearchDiagnostics {
+  radius: number;
+  queriesRun: string[];
+  rawResultCount: number;
+  dedupedCount: number;
+  filteredCount: number;
+  source: string;
+}
+
+export interface LocationAnalysisResult {
+  id?: string;
+  caseId: string;
+  source: "google_places" | "mock";
+  fallbackReason?: string;
+  analysisMode: "gemini" | "fallback";
+  targetLocation: TargetLocation;
+  radius: number;
+  competitors: Competitor[];
+  summary: string;
+  riskLevel: "Low" | "Medium" | "High";
+  riskScore: number;
+  riskExplanation: string;
+  followUpQuestions: string[];
+  suggestedTasks: SuggestedTask[];
+  searchDiagnostics?: SearchDiagnostics;
+  createdAt: string;
 }
 
 export interface FinalVerdictResponse {

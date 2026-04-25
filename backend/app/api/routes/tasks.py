@@ -184,21 +184,41 @@ async def complete_task(
     _get_case_ref(db, case_id, user["uid"])
 
     submitted_value = data.get("submitted_value", data.get("submittedValue"))
+    target_status = data.get("status", "completed")
+    task_dict = task_doc.to_dict()
     task_doc.reference.update({
-        "status": "completed",
+        "status": target_status,
         "submitted_value": submitted_value,
-        "completed_at": datetime.utcnow(),
+        "completed_at": datetime.utcnow() if target_status == "completed" else None,
         "updated_at": datetime.utcnow(),
+    })
+
+    # ── Sync with case_inputs ──
+    from app.services.case_service import CaseService
+    # Generate a key from the title (e.g. "Analyze Audience" -> "analyze_audience")
+    input_key = task_dict.get("title", "unnamed_task").lower().replace(" ", "_").replace("(", "").replace(")", "")
+    await CaseService().save_case_input(db, case_id, input_key, {
+        "answer": str(submitted_value) if submitted_value else "",
+        "structured_answer": submitted_value if isinstance(submitted_value, (dict, list)) else None,
+        "question": task_dict.get("title"),
+        "status": "partial" if target_status != "completed" else "submitted",
+        "source": "task",
+        "related_task_id": task_id
     })
 
     # ── Re-trigger agent now that user submitted evidence ──
     if case_id:
         from app.ai.orchestrator import run_agent_turn
-        from app.ai.schemas import BusinessCase as AICase
-
-        case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
-        case_data = case_ref.get().to_dict()
-
+        from app.services.case_service import CaseService
+        
+        # 1. Fetch unified context
+        context = await CaseService().get_case_ai_context(db, case_id)
+        if not context:
+            return {"status": "success", "task_id": task_id}
+            
+        # 2. Build AI Case
+        # We reuse the helper from chat.py if available, or just build it here
+        case_data = context["case"]
         ai_case = AICase(
             id=case_id,
             idea=case_data.get("description") or case_data.get("title") or "",
@@ -206,27 +226,46 @@ async def complete_task(
             budget_myr=float(case_data.get("budget_myr") or 30000),
             phase=case_data.get("ai_phase") or "EVIDENCE",
             fact_sheet=case_data.get("fact_sheet") or {},
-            messages=case_data.get("ai_messages") or [],
+            messages=context["messages"],
+            market_context=case_data.get("latest_market_summary") or case_data.get("latest_market_risk_explanation"),
+            tasks=context["tasks"],
+            location_analysis={
+                "resolved_name": case_data.get("latest_resolved_location_name"),
+                "resolved_address": case_data.get("latest_resolved_address"),
+                "risk_score": case_data.get("latest_market_risk_score"),
+                "risk_level": case_data.get("latest_market_risk_level"),
+                "competitor_count": case_data.get("latest_competitor_count"),
+                "strong_competitor_count": case_data.get("latest_strong_competitor_count")
+            } if case_data.get("latest_location_analysis_id") else None
         )
 
         # Tell the agent what the user submitted
-        import json
         ai_case.messages.append({
             "role": "user",
-            "content": json.dumps({
-                "task_completed": task_id,
-                "submitted_value": submitted_value,
+            "content": f"I've completed the task: {task_doc.to_dict().get('title')}. Answer: {submitted_value}"
+        })
+
+        try:
+            updated_case, _ = await run_agent_turn(ai_case)
+
+            # Update case state
+            case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+            case_ref.update({
+                "ai_phase":    updated_case.phase,
+                "fact_sheet":  updated_case.fact_sheet,
+                "ai_messages": updated_case.messages,
+                "updated_at":  datetime.utcnow(),
             })
-        })
 
-        updated_case, _ = await run_agent_turn(ai_case)
-
-        case_ref.update({
-            "ai_phase":    updated_case.phase,
-            "fact_sheet":  updated_case.fact_sheet,
-            "ai_messages": updated_case.messages,
-            "updated_at":  datetime.utcnow(),
-        })
+            # Also save AI response to chat if possible (default session)
+            session_ref = case_ref.collection("chat_sessions").document("default_session")
+            if session_ref.get().exists:
+                ai_msg = updated_case.messages[-1]
+                ai_msg["created_at"] = datetime.utcnow()
+                session_ref.collection("messages").document().set(ai_msg)
+        except Exception as e:
+            import logging
+            logging.error(f"Task re-trigger failed: {e}")
 
     return {"status": "success", "task_id": task_id}
 

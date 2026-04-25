@@ -15,7 +15,7 @@ Keeps GLM context lean for long investigations.
 """
 
 from app.ai.schemas import BusinessCase
-from app.ai.prompts_templates import REQUIRED_FACTS
+from app.ai.prompts_templates import CHECKLIST_FACTORS
 
 
 class MemoryManager:
@@ -27,14 +27,14 @@ class MemoryManager:
         Injected at the top of context when message history is long.
         """
         facts = case.fact_sheet
-        collected = [f for f in REQUIRED_FACTS if f in facts]
-        missing = [f for f in REQUIRED_FACTS if f not in facts]
+        collected = [f for f in CHECKLIST_FACTORS if f in facts]
+        missing = [f for f in CHECKLIST_FACTORS if f not in facts]
 
         lines = [
             f"Investigation summary for: {case.idea}",
             f"Location: {case.location} | Budget: RM {case.budget_myr:,.0f}",
             f"Phase: {case.phase}",
-            f"Facts collected ({len(collected)}/{len(REQUIRED_FACTS)}): {', '.join(collected) or 'none'}",
+            f"Facts collected ({len(collected)}/{len(CHECKLIST_FACTORS)}): {', '.join(collected) or 'none'}",
             f"Still missing: {', '.join(missing) or 'none — ready for verdict'}",
         ]
 
@@ -51,8 +51,8 @@ class MemoryManager:
             "phase": case.phase,
             "fact_sheet": case.fact_sheet,
             "message_count": len(case.messages),
-            "facts_collected": [f for f in REQUIRED_FACTS if f in case.fact_sheet],
-            "facts_missing": [f for f in REQUIRED_FACTS if f not in case.fact_sheet],
+            "facts_collected": [f for f in CHECKLIST_FACTORS if f in case.fact_sheet],
+            "facts_missing": [f for f in CHECKLIST_FACTORS if f not in case.fact_sheet],
         }
 
     async def update_memory(self, case: BusinessCase, new_facts: dict) -> BusinessCase:
