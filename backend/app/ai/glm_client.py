@@ -97,12 +97,15 @@ async def glm_call(
         },
         "contents": contents,
         "tools": [
+            # Google Search grounding — Gemini searches automatically
+            # when it needs real-world data like rental prices,
+            # competitor counts, footfall, market rates etc.
             {"google_search": {}}
         ],
         "generation_config": {
             "temperature": 0.2,
             "max_output_tokens": int(settings.GLM_MAX_TOKENS),
-            "response_mime_type": "text/plain",
+            "response_mime_type": "text/plain",  # we parse JSON ourselves
         },
     }
 
@@ -143,12 +146,12 @@ async def glm_call(
     # Extract text from Gemini native response format
     content = _extract_text_from_gemini(raw)
 
-    # If content is empty after search, Gemini is still processing —
-    # append search results to context and retry once
+    # If content is empty — Gemini may still be processing after search
     if not content or not content.strip():
         if _retry < 2:
-            logger.warning("Gemini returned empty content after search — retrying (%s/2)", _retry + 1)
-            # Append a follow-up nudge so Gemini produces JSON output
+            logger.warning(
+                "Gemini returned empty content — retrying (%s/2)", _retry + 1
+            )
             messages.append({
                 "role": "assistant",
                 "content": "[Search completed. Now output your JSON decision based on the search results.]"
@@ -168,7 +171,9 @@ async def glm_call(
     # If still empty after stripping fences
     if not content:
         if _retry < 2:
-            logger.warning("Gemini returned empty JSON after fence strip — retrying (%s/2)", _retry + 1)
+            logger.warning(
+                "Gemini returned empty JSON after fence strip — retrying (%s/2)", _retry + 1
+            )
             messages.append({
                 "role": "assistant",
                 "content": "[Search completed. Now output your JSON decision based on the search results.]"
@@ -176,7 +181,29 @@ async def glm_call(
             return await glm_call(messages=messages, system=system, _retry=_retry + 1)
         raise ValueError("Gemini returned empty JSON after fence strip.")
 
-    print(f"DEBUG content after strip: {repr(content[:200])}")
+    # If content doesn't start with { or [ — Gemini returned prose instead of JSON
+    # Nudge it to output JSON and retry
+    if not content.startswith("{") and not content.startswith("["):
+        if _retry < 2:
+            logger.warning(
+                "Gemini returned prose instead of JSON — retrying (%s/2): %s",
+                _retry + 1, content[:100]
+            )
+            messages.append({
+                "role": "assistant",
+                "content": content  # include Gemini's prose so it has context
+            })
+            messages.append({
+                "role": "user",
+                "content": (
+                    "You returned prose instead of JSON. "
+                    "You MUST output only a valid JSON object matching one of the required types. "
+                    "No explanation, no markdown, just raw JSON starting with {."
+                )
+            })
+            return await glm_call(messages=messages, system=system, _retry=_retry + 1)
+        raise ValueError(f"Gemini returned prose after {_retry} retries: {content[:200]}")
+
     data = json.loads(content)
 
     # Gemini sometimes wraps response in a list — unwrap it
