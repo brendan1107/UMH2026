@@ -79,6 +79,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  attachments?: string[];
   createdAt: string;
 }
 
@@ -128,4 +129,10 @@ export interface FinalVerdictResponse {
   verdict: "Continue" | "Continue with caution" | "Pivot" | "Stop / Cancel";
   reasoning: string;
   nextSteps: string[];
+  strengths?: string[];
+  risks?: Array<{
+    title?: string;
+    reasoning?: string;
+    mitigation?: string;
+  }>;
 }

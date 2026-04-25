@@ -8,8 +8,11 @@ export const chatService = {
   /**
    * Send a message and receive an AI response.
    */
-  async sendMessage(caseId: string, sessionId: string, content: string): Promise<ChatMessage> {
-    return apiClient.post<ChatMessage>(`/chat/${caseId}/sessions/${sessionId}/messages`, { content });
+  async sendMessage(caseId: string, sessionId: string, content: string, attachments: string[] = []): Promise<ChatMessage> {
+    return apiClient.post<ChatMessage>(`/chat/${caseId}/sessions/${sessionId}/messages`, {
+      content,
+      attachments,
+    });
   },
 
   /**

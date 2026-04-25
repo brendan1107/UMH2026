@@ -7,17 +7,26 @@ from app.ai.tools import TOOL_REGISTRY
 from app.ai.state import next_phase, apply_tool_result
 
 MAX_TOOL_DEPTH = 5
+AGENT_HISTORY_LIMIT = 12
+AGENT_MAX_TOKENS = 900
+
+
+def _recent_messages(messages: list[dict], limit: int = AGENT_HISTORY_LIMIT) -> list[dict]:
+    """Keep chat calls small; fact_sheet is the long-term memory."""
+    return messages[-limit:] if len(messages) > limit else messages
+
 
 async def run_agent_turn(
     case: BusinessCase,
     _depth: int = 0,
+    timeout: float = 60,
 ) -> tuple[BusinessCase, AgentOutput]:
     if _depth >= MAX_TOOL_DEPTH:
         raise RuntimeError(f"Agent exceeded max tool call depth ({MAX_TOOL_DEPTH}).")
 
     system = build_agent_prompt(case)
 
-    messages = case.messages
+    messages = _recent_messages(case.messages)
     if not messages:
         messages = [{
             "role": "user",
@@ -27,6 +36,8 @@ async def run_agent_turn(
     output = await glm_call(
         messages=messages,
         system=system,
+        timeout=timeout,
+        max_tokens=AGENT_MAX_TOKENS,
     )
 
     case.messages.append({
@@ -46,7 +57,7 @@ async def run_agent_turn(
                     "data": result.model_dump(),
                 })
             })
-            return await run_agent_turn(case, _depth=_depth + 1)
+            return await run_agent_turn(case, _depth=_depth + 1, timeout=timeout)
 
     # If verdict, mark phase but don't lock —
     # user can add more info and get a revised verdict

@@ -41,11 +41,17 @@ def create_app() -> FastAPI:
         description="AI-powered business investigation partner for small F&B owners",
         version="1.0.0",
     )
+    dev_origin_regex = (
+        r"^http://(localhost|127\.0\.0\.1):\d+$"
+        if settings.APP_ENV.lower() == "development"
+        else None
+    )
 
     # CORS middleware for Next.js frontend
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
+        allow_origin_regex=dev_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

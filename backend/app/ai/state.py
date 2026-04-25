@@ -15,6 +15,8 @@ def next_phase(case: BusinessCase, output: AgentOutput) -> Phase:
     current = case.phase
 
     if current == "INTAKE":
+        if output.type == "clarify":
+            return "INTAKE"
         return "MARKET_SCAN"
 
     if current == "MARKET_SCAN":

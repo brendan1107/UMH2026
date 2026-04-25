@@ -19,6 +19,7 @@ __pycache__/
 
 # Generic environment and build
 .env
+.env.backend
 dist/
 build/
 node_modules/

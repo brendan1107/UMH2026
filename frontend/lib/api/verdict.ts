@@ -6,6 +6,6 @@ import { FinalVerdictResponse } from "./types";
  */
 export const verdictService = {
   async generateVerdict(caseId: string): Promise<FinalVerdictResponse> {
-    return apiClient.post<FinalVerdictResponse>(`/reports/${caseId}/verdict`);
+    return apiClient.post<FinalVerdictResponse>(`/reports/${caseId}/final-verdict`);
   }
 };

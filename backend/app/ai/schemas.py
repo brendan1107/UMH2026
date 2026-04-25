@@ -1,7 +1,7 @@
 # all pydantic models for ai agent
 
 # app/ai/schemas.py
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, Field, UUID4
 from typing import Any, Literal, Optional
 from datetime import datetime
 
@@ -37,6 +37,7 @@ class VerdictOutput(BaseModel):
     confidence: float          # 0.0 – 1.0
     summary: str               # 2–3 sentence exec summary
     pivot_suggestion: Optional[str] = None  # only if PIVOT
+    strengths: list[str] = Field(default_factory=list)
 
 # Union — every GLM response must be one of these
 AgentOutput = ToolCallOutput | FieldTaskOutput | ClarifyOutput | VerdictOutput

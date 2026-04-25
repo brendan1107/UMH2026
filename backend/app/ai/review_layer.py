@@ -1,29 +1,28 @@
 # app/ai/review_layer.py
 import json
-import os
-import httpx
-from pathlib import Path
 
-# Force load .env — walk up until we find it
-_env = Path(__file__)
-for _ in range(5):
-    _env = _env.parent
-    if (_env / ".env").exists():
-        from dotenv import load_dotenv
-        load_dotenv(dotenv_path=_env / ".env", override=True)
-        break
+import httpx
 
 from app.ai.prompts_templates import AUDITOR_PROMPT
 from app.ai.schemas import AuditResult, BusinessCase
+from app.config import settings
 
-ZAI_BASE = os.getenv("GLM_API_BASE_URL", "").rstrip("/")
-ZAI_KEY  = os.getenv("GLM_API_KEY", "")
 
 async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
-    # 1. Define the model explicitly here!
+    base_url = settings.GLM_API_BASE_URL.strip().rstrip("/")
+    api_key = settings.GLM_API_KEY.strip()
+    model_name = settings.GLM_MODEL_NAME.strip() or "gemini-2.5-flash"
 
-    # replace with gemini model for better performance
-    model_name = os.getenv("GLM_MODEL_NAME", "gemini-2.5-flash")
+    if "generativelanguage.googleapis.com" in base_url and not base_url.endswith("/openai"):
+        base_url = f"{base_url}/openai"
+
+    missing = []
+    if not base_url:
+        missing.append("GLM_API_BASE_URL")
+    if not api_key:
+        missing.append("GLM_API_KEY")
+    if missing:
+        raise RuntimeError(f"Missing GLM configuration: {', '.join(missing)}")
 
     user_content = json.dumps({
         "business_plan_summary": plan_summary,
@@ -32,16 +31,15 @@ async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
         "budget_myr": case.budget_myr,
     })
 
-    # 2. Use 120s timeout to give AI time to think
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
-            f"{ZAI_BASE}/chat/completions",  # 3. Correct endpoint
-            headers={"Authorization": f"Bearer {ZAI_KEY}"},
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "model": model_name,         # 4. Use the fixed variable
+                "model": model_name,
                 "messages": [
                     {"role": "system", "content": AUDITOR_PROMPT},
-                    {"role": "user",   "content": user_content},
+                    {"role": "user", "content": user_content},
                 ],
                 "temperature": 0.2,
                 "max_tokens": 5000,
@@ -51,21 +49,17 @@ async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
             raise RuntimeError(f"Gemini API Error: {resp.text}")
         resp.raise_for_status()
 
-    # 1. Safely parse the raw JSON first
     raw_data = resp.json()
     content = raw_data["choices"][0]["message"].get("content")
-    
-    # 2. Check if the AI returned null/None
+
     if content is None:
         raise ValueError(f"GLM returned null content. Full response: {raw_data}")
 
-    # 3. Now it is safe to strip
     content = content.strip()
-    
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):
             content = content[4:]
-            
+
     data = json.loads(content.strip())
     return AuditResult(**data)

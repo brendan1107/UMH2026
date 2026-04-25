@@ -19,6 +19,8 @@ interface RecommendationPanelProps {
   onGenerateVerdict?: () => void;
   onEndSessionClick?: () => void;
   onReopenSessionClick?: () => void;
+  onExportPdf?: () => void;
+  isExportingPdf?: boolean;
 }
 
 export default function RecommendationPanel({ 
@@ -27,7 +29,9 @@ export default function RecommendationPanel({
   finalInsight, 
   onGenerateVerdict, 
   onEndSessionClick,
-  onReopenSessionClick
+  onReopenSessionClick,
+  onExportPdf,
+  isExportingPdf = false
 }: RecommendationPanelProps) {
   if (data.status === "gathering") {
     return (
@@ -68,6 +72,7 @@ export default function RecommendationPanel({
       default: return "bg-slate-50 border-slate-200 text-slate-800";
     }
   };
+  const showExecutiveSummary = Boolean(data.summary && data.summary !== data.verdictReasoning);
 
   return (
     <div className="space-y-6">
@@ -145,14 +150,18 @@ export default function RecommendationPanel({
         </div>
       )}
 
-      <div className="bg-white  rounded-xl border border-slate-200  p-4 shadow-sm">
-        <h3 className="font-semibold text-slate-900  mb-2">Executive Summary</h3>
-        <p className="text-sm text-slate-600  leading-relaxed">
-          {data.summary}
-        </p>
-      </div>
+      {showExecutiveSummary && (
+        <div className="bg-white  rounded-xl border border-slate-200  p-4 shadow-sm">
+          <h3 className="font-semibold text-slate-900  mb-2">Executive Summary</h3>
+          <p className="text-sm text-slate-600  leading-relaxed">
+            {data.summary}
+          </p>
+        </div>
+      )}
 
+      {((data.strengths || []).length > 0 || (data.risks || []).length > 0) && (
       <div className="space-y-4">
+        {(data.strengths || []).length > 0 && (
         <div>
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -166,7 +175,9 @@ export default function RecommendationPanel({
             ))}
           </ul>
         </div>
+        )}
 
+        {(data.risks || []).length > 0 && (
         <div>
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -180,18 +191,20 @@ export default function RecommendationPanel({
             ))}
           </ul>
         </div>
+        )}
       </div>
+      )}
 
       <div className="mt-6 flex flex-col gap-3">
         {sessionStatus !== "archived" && (
           <div className="flex flex-col gap-2 p-4 bg-slate-50  border border-slate-200  rounded-xl mb-2">
             <p className="text-xs font-semibold text-slate-500  uppercase tracking-wider text-center">Investigation Actions</p>
-            {!data.verdict && onGenerateVerdict && (
+            {onGenerateVerdict && (
               <button 
                 onClick={onGenerateVerdict}
                 className="w-full bg-slate-200  text-slate-800  font-medium py-2 rounded-lg hover:bg-slate-300  transition-colors shadow-sm text-sm"
               >
-                Generate Quick Verdict
+                {data.verdict ? "Regenerate Verdict" : "Generate Quick Verdict"}
               </button>
             )}
             {onEndSessionClick && (
@@ -205,11 +218,16 @@ export default function RecommendationPanel({
           </div>
         )}
         
-        <button className="w-full bg-white  border border-slate-300  text-slate-700  font-medium py-2.5 rounded-lg hover:bg-slate-50  transition-colors shadow-sm text-sm flex justify-center items-center gap-2">
+        <button
+          onClick={onExportPdf}
+          disabled={!data.verdict || isExportingPdf}
+          title={!data.verdict ? "Generate verdict before exporting." : undefined}
+          className="w-full bg-white  border border-slate-300  text-slate-700  font-medium py-2.5 rounded-lg hover:bg-slate-50  transition-colors shadow-sm text-sm flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Export PDF Report
+          {isExportingPdf ? "Exporting PDF..." : "Export PDF Report"}
         </button>
       </div>
     </div>

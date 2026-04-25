@@ -10,13 +10,15 @@ export const reportsService = {
   },
 
   async exportPdf(caseId: string): Promise<void> {
-    const response = await apiClient.get<Blob>(`/reports/${caseId}/report/pdf`);
+    const response = await apiClient.getBlob(`/reports/${caseId}/report/pdf`);
     // Create a URL for the blob and trigger download
     const url = window.URL.createObjectURL(response);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `report-${caseId}.pdf`;
+    a.download = `fnb-genie-${caseId.slice(0, 8)}.pdf`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     window.URL.revokeObjectURL(url);
   }
 };

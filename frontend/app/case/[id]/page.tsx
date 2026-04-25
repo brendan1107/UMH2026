@@ -78,6 +78,23 @@ const toTaskUploadAction = (upload: EvidenceUpload): UploadedTaskAction => ({
   url: upload.url,
 });
 
+const toTaskUploadedFilesAction = (uploads: UploadedTaskAction[]): TaskActionData =>
+  uploads.length === 1
+    ? uploads[0]
+    : {
+        uploads,
+        uploadIds: uploads.map((upload) => upload.uploadId),
+        fileNames: uploads.map((upload) => upload.fileName),
+      };
+
+const formatUploadedFilesMessage = (uploads: UploadedTaskAction[]) => {
+  if (uploads.length === 1) {
+    return `Uploaded file: ${uploads[0].fileName}.`;
+  }
+
+  return `Uploaded files:\n${uploads.map((upload) => `- ${upload.fileName}`).join("\n")}`;
+};
+
 const isUploadNotFoundError = (error: unknown) =>
   error instanceof Error && error.message.toLowerCase().includes("upload not found");
 
@@ -94,6 +111,7 @@ export default function CaseWorkspace() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [caseDetails, setCaseDetails] = useState<BusinessCase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   
   // Session Status State
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("active");
@@ -163,14 +181,57 @@ export default function CaseWorkspace() {
     }
   }, [id]);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, pendingFiles: File[] = []): Promise<boolean> => {
+    let messageContent = content.trim();
+    let uploadedActions: UploadedTaskAction[] = [];
+
+    try {
+      if (pendingFiles.length > 0) {
+        const uploadedFiles = await uploadEvidenceFiles(pendingFiles);
+        uploadedActions = uploadedFiles.map(toTaskUploadAction);
+        const uploadMessage = formatUploadedFilesMessage(uploadedActions);
+        messageContent = messageContent ? `${messageContent}\n\n${uploadMessage}` : uploadMessage;
+
+        const uploadTask = tasks.find(t => (t.type === "upload_file" || t.type === "upload_image") && t.status === "pending");
+        if (uploadTask) {
+          const updatedTask = await tasksService.updateTask(
+            id,
+            uploadTask.id,
+            "completed",
+            toTaskUploadedFilesAction(uploadedActions)
+          );
+          setTasks((prev) =>
+            prev.map((task) => (task.id === uploadTask.id ? ({ ...task, ...updatedTask } as Task) : task))
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to upload attached files", error);
+      alert("Failed to upload attached files. Please try again.");
+      return false;
+    }
+
+    if (!messageContent) return false;
+
     // Optimistic UI for user message
-    const userMessage: ChatMessage = { id: Date.now().toString(), role: "user", content, createdAt: new Date().toISOString() };
+    const createdAt = new Date().toISOString();
+    const userMessage: ChatMessage = {
+      id: `local-${createdAt}`,
+      role: "user",
+      content: messageContent,
+      attachments: uploadedActions.map((upload) => upload.uploadId),
+      createdAt
+    };
     setMessages((prev) => [...prev, userMessage]);
     setRecommendation((prev) => prev ? { ...prev, status: "gathering" } : prev);
 
     try {
-      const aiMessage = await chatService.sendMessage(id, "default_session", content);
+      const aiMessage = await chatService.sendMessage(
+        id,
+        "default_session",
+        messageContent,
+        uploadedActions.map((upload) => upload.uploadId)
+      );
       setMessages((prev) => [...prev, aiMessage]);
       await refreshTasks();
 
@@ -183,17 +244,19 @@ export default function CaseWorkspace() {
     } catch (error) {
       console.error("Failed to send message", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const createdAt = new Date().toISOString();
       const assistantErrorMessage: ChatMessage = {
-        id: `${Date.now()}-send-error`,
+        id: `local-send-error-${createdAt}`,
         role: "assistant",
-        content: `I could not reach the backend AI service, so no investigation task was created. ${errorMessage}`,
-        createdAt: new Date().toISOString()
+        content: `I could not reach the backend API, so this message was not saved. ${errorMessage}`,
+        createdAt
       };
       setMessages((prev) => [...prev, assistantErrorMessage]);
       setRecommendation((prev) =>
         prev ? { ...prev, status: "gathering" } : prev
       );
     }
+    return true;
   };
 
   const handleTaskActionClick = (task: Task) => {
@@ -260,20 +323,57 @@ export default function CaseWorkspace() {
   };
 
   const handleGenerateVerdict = async () => {
-    setRecommendation(prev => prev ? { ...prev, status: "generating_verdict" } : prev);
+    setRecommendation(prev => prev ? { ...prev, status: "generating_verdict" } : {
+      status: "generating_verdict",
+      summary: "",
+      strengths: [],
+      risks: []
+    });
     
     try {
       const verdict = await verdictService.generateVerdict(id);
-      setRecommendation(prev => prev ? {
-        ...prev,
+      setRecommendation(prev => ({
+        ...(prev || {}),
         status: "ready",
+        summary: verdict.reasoning,
+        strengths: verdict.strengths || prev?.strengths || [],
         verdict: verdict.verdict,
         verdictReasoning: verdict.reasoning,
-        nextSteps: verdict.nextSteps
-      } : prev);
+        nextSteps: verdict.nextSteps,
+        risks: verdict.risks?.map((risk) =>
+          [risk.title, risk.reasoning].filter(Boolean).join(": ")
+        ) || prev?.risks || []
+      }));
+
+      try {
+        const updatedRec = await reportsService.getLatestRecommendation(id);
+        setRecommendation(updatedRec as RecommendationData);
+      } catch (error) {
+        console.error("Failed to refresh generated recommendation", error);
+      }
     } catch (error) {
       console.error("Failed to generate verdict", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate verdict.";
+      alert(errorMessage);
       setRecommendation(prev => prev ? { ...prev, status: "ready" } : prev);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!recommendation?.verdict) {
+      alert("Generate a verdict before exporting the PDF report.");
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      await reportsService.exportPdf(id);
+    } catch (error) {
+      console.error("Failed to export PDF report", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to export PDF report.";
+      alert(errorMessage);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -304,9 +404,17 @@ export default function CaseWorkspace() {
     }
   };
 
-  const uploadEvidenceFile = async (file: File): Promise<EvidenceUpload> => {
-    const uploaded = await uploadsService.uploadFile(id, file);
+  const uploadEvidenceFiles = async (pendingFiles: File[]): Promise<EvidenceUpload[]> => {
+    const uploadedFiles: EvidenceUpload[] = [];
+    for (const file of pendingFiles) {
+      uploadedFiles.push(await uploadsService.uploadFile(id, file));
+    }
     await refreshUploads();
+    return uploadedFiles;
+  };
+
+  const uploadEvidenceFile = async (file: File): Promise<EvidenceUpload> => {
+    const [uploaded] = await uploadEvidenceFiles([file]);
     return uploaded;
   };
 
@@ -446,6 +554,8 @@ export default function CaseWorkspace() {
       onGenerateVerdict={handleGenerateVerdict} 
       onEndSessionClick={() => setIsEndSessionModalOpen(true)}
       onReopenSessionClick={handleReopenSession}
+      onExportPdf={handleExportPdf}
+      isExportingPdf={isExportingPdf}
     />
   );
 
@@ -471,7 +581,6 @@ export default function CaseWorkspace() {
         <div className="shrink-0">
           <ChatInput
             onSendMessage={handleSendMessage}
-            onFileUpload={handleFileUpload}
             disabled={sessionStatus === "archived"}
           />
         </div>

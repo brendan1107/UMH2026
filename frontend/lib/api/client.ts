@@ -10,6 +10,10 @@ export const apiClient = {
     return this.request<T>(endpoint, { method: "GET" });
   },
 
+  async getBlob(endpoint: string): Promise<Blob> {
+    return this.requestBlob(endpoint, { method: "GET" });
+  },
+
   async post<T>(endpoint: string, body?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: "POST",
@@ -32,6 +36,31 @@ export const apiClient = {
    * Internal request handler with token injection.
    */
   async request<T>(endpoint: string, options: RequestInit): Promise<T> {
+    const response = await this.fetchRaw(endpoint, options);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `API request failed: ${response.status}`);
+    }
+
+    // Handles empty responses (like 204 No Content)
+    if (response.status === 204) return {} as T;
+
+    return response.json();
+  },
+
+  async requestBlob(endpoint: string, options: RequestInit): Promise<Blob> {
+    const response = await this.fetchRaw(endpoint, options);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `API request failed: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
+  async fetchRaw(endpoint: string, options: RequestInit): Promise<Response> {
     const user = auth.currentUser;
     const token = user ? await user.getIdToken() : null;
 
@@ -51,19 +80,15 @@ export const apiClient = {
     const endpointStr = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = endpoint.startsWith("http") ? endpoint : `${baseUrlStr}${endpointStr}`;
     
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `API request failed: ${response.status}`);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch {
+      throw new Error(`Backend API is unreachable at ${url}. Confirm the FastAPI server is running and NEXT_PUBLIC_API_URL is correct.`);
     }
-
-    // Handles empty responses (like 204 No Content)
-    if (response.status === 204) return {} as T;
-
-    return response.json();
+    return response;
   },
 };
