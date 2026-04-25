@@ -1,5 +1,3 @@
-#All system prompts
-
 # app/ai/prompts_templates.py
 import json
 
@@ -25,27 +23,25 @@ CURRENT CASE:
 - Budget: RM {case.budget_myr:,.0f}
 - Phase: {case.phase}
 
-KNOWN FACTS (do not fabricate anything not in this dict):
+KNOWN FACTS:
 {json.dumps(case.fact_sheet, indent=2)}
 
-MISSING FACTS (you need these before issuing a verdict):
+MISSING FACTS:
 {missing if missing else "None — you may now issue a verdict."}
 
 YOUR RULES:
-1. USE GOOGLE SEARCH to find real data about {case.location} — rental prices,
-   competitor counts, footfall estimates, market rates. Do not ask the user for
-   data you can find yourself via search.
-2. Only ask the user for data that cannot be found online — e.g. their personal
-   budget breakdown, confirmed lease terms, actual daily sales.
+1. USE GOOGLE SEARCH to find real data about {case.location} — rental prices, competitor counts, footfall estimates, market rates. Do not ask the user for data you can find yourself via search.
+2. Only ask the user for data that cannot be found online — e.g. their personal budget breakdown, confirmed lease terms, actual daily sales.
 3. Never invent numbers. Search first, then ask if search fails.
-4. Always output valid JSON matching exactly one of these types:
-   - {{"type":"tool_call","tool":"...","args":{{...}}}}
-   - {{"type":"field_task","title":"...","instruction":"...","evidence_type":"count|photo|rating|text"}}
-   - {{"type":"clarify","question":"...","options":[...]}}
-   - {{"type":"verdict","decision":"GO|PIVOT|STOP","confidence":0.0-1.0,"summary":"...","pivot_suggestion":"..."}}
-5. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
-6. Be specific — cite actual numbers from search results or user input.
-7. Output JSON only. No preamble, no explanation outside the JSON.
+4. FILE ANALYSIS: If the user submits an image, PDF, or spreadsheet, read it carefully and extract the numbers to update the fact_sheet.
+5. STRICT JSON FORMATTING: You MUST output valid JSON only. You are STRICTLY REQUIRED to include ALL keys for your chosen type. Do not miss any keys.
+   - Type 1: {{"type":"tool_call", "tool":"...", "args":{{...}}}}
+   - Type 2: {{"type":"field_task", "title":"...", "instruction":"...", "evidence_type":"count|photo|rating|text"}}  <-- YOU MUST INCLUDE evidence_type!
+   - Type 3: {{"type":"clarify", "question":"...", "options":[...]}}
+   - Type 4: {{"type":"verdict", "decision":"GO|PIVOT|STOP", "confidence":0.0, "summary":"...","pivot_suggestion":"..."}}
+6. {"You MAY issue a verdict now." if can_verdict else "You MUST NOT issue a verdict yet. Collect the missing facts first."}
+7. Be specific — cite actual numbers from search results or user input.
+8. Output JSON only. No preamble, no explanation outside the JSON.
 """
 
 # Pass 2 — the adversarial auditor

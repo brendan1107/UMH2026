@@ -1,12 +1,12 @@
 # app/ai/glm_client.py
 import json
 import logging
+import asyncio
 import httpx
 from app.ai.schemas import AgentOutput
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-
 
 def _development_fallback_output() -> AgentOutput:
     """Return a usable task when the configured local AI key is unavailable."""
@@ -20,7 +20,6 @@ def _development_fallback_output() -> AgentOutput:
         ),
         evidence_type="text",
     )
-
 
 def _get_glm_config() -> tuple[str, str, str]:
     """
@@ -45,18 +44,15 @@ def _extract_text_from_gemini(raw: dict) -> str:
     """
     try:
         parts = raw["candidates"][0]["content"]["parts"]
-        return "".join(p.get("text", "") for p in parts)
+        return "".join(p.get("text", "") for p in parts if "text" in p)
     except (KeyError, IndexError) as e:
         raise ValueError(f"Unexpected Gemini response shape: {raw}") from e
 
 
-def _convert_messages_to_gemini(
-    system: str, messages: list[dict]
-) -> tuple[str, list[dict]]:
+def _convert_messages_to_gemini(system: str, messages: list[dict]) -> tuple[str, list[dict]]:
     """
-    Convert OpenAI-style messages to Gemini native format.
-    Gemini uses 'contents' with 'role: user/model' and 'parts'.
-    System prompt goes into system_instruction separately.
+    Convert OpenAI-style messages (including Multimodal Data URIs) 
+    to Gemini native format.
     """
     contents = []
     for msg in messages:
@@ -64,24 +60,45 @@ def _convert_messages_to_gemini(
         content = msg.get("content", "")
         # Gemini uses 'model' instead of 'assistant'
         gemini_role = "model" if role == "assistant" else "user"
-        contents.append({
-            "role": gemini_role,
-            "parts": [{"text": content}]
-        })
+        
+        parts = []
+        if isinstance(content, str) and content.strip():
+            parts.append({"text": content})
+        elif isinstance(content, list):
+            for item in content:
+                if item.get("type") == "text":
+                    parts.append({"text": item["text"]})
+                elif item.get("type") == "image_url":
+                    # Convert Base64 Data URI to Native Gemini Inline Data
+                    url = item["image_url"]["url"]
+                    if url.startswith("data:"):
+                        mime_type = url.split(";")[0].replace("data:", "")
+                        b64_data = url.split(",")[1]
+                        parts.append({
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": b64_data
+                            }
+                        })
+        if parts:
+            contents.append({
+                "role": gemini_role,
+                "parts": parts
+            })
+            
     return system, contents
 
 
 async def glm_call(
     messages: list[dict],
     system: str,
+    max_retries: int = 3,
     _retry: int = 0,
 ) -> AgentOutput:
+    
     base_url, api_key, model = _get_glm_config()
 
-    # Filter out empty messages — API rejects them
-    messages = [m for m in messages if m.get("content", "").strip()]
-
-    # Convert to Gemini native format
+    # Convert to Gemini native format and translate images
     system_instruction, contents = _convert_messages_to_gemini(system, messages)
 
     # If no contents, add a starter message
@@ -97,15 +114,13 @@ async def glm_call(
         },
         "contents": contents,
         "tools": [
-            # Google Search grounding — Gemini searches automatically
-            # when it needs real-world data like rental prices,
-            # competitor counts, footfall, market rates etc.
+            # Google Search grounding
             {"google_search": {}}
         ],
         "generation_config": {
             "temperature": 0.2,
-            "max_output_tokens": int(settings.GLM_MAX_TOKENS),
-            "response_mime_type": "text/plain",  # we parse JSON ourselves
+            "max_output_tokens": 2500,
+            "response_mime_type": "text/plain", 
         },
     }
 
@@ -118,18 +133,23 @@ async def glm_call(
             )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            logger.error(
-                "Gemini API request failed: status=%s body=%s",
-                exc.response.status_code,
-                exc.response.text[:500],
-            )
+            # Handle rate limits and server errors with recursion
+            if exc.response.status_code in (429, 503, 504) and _retry < max_retries:
+                wait = (_retry + 1) * 5
+                logger.warning(f"HTTP {exc.response.status_code}, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                return await glm_call(messages, system, max_retries, _retry + 1)
+                
             if settings.APP_ENV == "development" and exc.response.status_code == 401:
-                logger.warning("Using development fallback — Gemini auth failed.")
                 return _development_fallback_output()
             raise
-        except httpx.HTTPError:
-            logger.exception("Gemini API request failed before receiving a response.")
-            raise
+        except httpx.TimeoutException:
+            if _retry < max_retries:
+                wait = (_retry + 1) * 5
+                logger.warning(f"Timeout, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                return await glm_call(messages, system, max_retries, _retry + 1)
+            raise RuntimeError("Gemini timeout after 60s")
 
         raw = resp.json()
 
@@ -146,72 +166,45 @@ async def glm_call(
     # Extract text from Gemini native response format
     content = _extract_text_from_gemini(raw)
 
-    # If content is empty — Gemini may still be processing after search
+    # ── LOGICAL RETRIES (Empty content or Prose) ──
     if not content or not content.strip():
-        if _retry < 2:
-            logger.warning(
-                "Gemini returned empty content — retrying (%s/2)", _retry + 1
-            )
-            messages.append({
-                "role": "assistant",
-                "content": "[Search completed. Now output your JSON decision based on the search results.]"
-            })
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1)
-        raise ValueError(f"Gemini returned empty content after {_retry} retries. Full response: {raw}")
+        if _retry < max_retries:
+            logger.warning("Gemini returned empty content — retrying")
+            messages.append({"role": "assistant", "content": "[Search completed. Now output JSON decision.]"})
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Gemini returned empty content. Full response: {raw}")
 
     content = content.strip()
 
-    # Strip markdown fences if Gemini wraps in ```json
+    # Strip markdown fences
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):
             content = content[4:]
     content = content.strip()
 
-    # If still empty after stripping fences
-    if not content:
-        if _retry < 2:
-            logger.warning(
-                "Gemini returned empty JSON after fence strip — retrying (%s/2)", _retry + 1
-            )
-            messages.append({
-                "role": "assistant",
-                "content": "[Search completed. Now output your JSON decision based on the search results.]"
-            })
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1)
-        raise ValueError("Gemini returned empty JSON after fence strip.")
-
-    # If content doesn't start with { or [ — Gemini returned prose instead of JSON
-    # Nudge it to output JSON and retry
     if not content.startswith("{") and not content.startswith("["):
-        if _retry < 2:
-            logger.warning(
-                "Gemini returned prose instead of JSON — retrying (%s/2): %s",
-                _retry + 1, content[:100]
-            )
-            messages.append({
-                "role": "assistant",
-                "content": content  # include Gemini's prose so it has context
-            })
-            messages.append({
-                "role": "user",
-                "content": (
-                    "You returned prose instead of JSON. "
-                    "You MUST output only a valid JSON object matching one of the required types. "
-                    "No explanation, no markdown, just raw JSON starting with {."
-                )
-            })
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1)
-        raise ValueError(f"Gemini returned prose after {_retry} retries: {content[:200]}")
+        if _retry < max_retries:
+            logger.warning("Gemini returned prose instead of JSON — retrying")
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": "You MUST output only a valid JSON object starting with {."})
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Gemini returned prose: {content[:200]}")
 
-    data = json.loads(content)
+    # ── JSON PARSING ──
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as e:
+        if _retry < max_retries:
+            logger.warning("JSON parse error — retrying")
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Invalid JSON: {e}")
 
-    # Gemini sometimes wraps response in a list — unwrap it
     if isinstance(data, list):
         data = data[0]
 
     if not isinstance(data, dict) or "type" not in data:
-        raise ValueError(f"Unexpected agent response shape: {data}")
+        raise ValueError(f"Unexpected shape: {data}")
 
     type_map = {
         "tool_call":  "ToolCallOutput",
@@ -219,6 +212,10 @@ async def glm_call(
         "clarify":    "ClarifyOutput",
         "verdict":    "VerdictOutput",
     }
+    
     from app.ai import schemas
-    model_cls = getattr(schemas, type_map[data["type"]])
-    return model_cls(**data)
+    cls_name = type_map.get(data["type"])
+    if not cls_name:
+        raise ValueError(f"Unknown type: {data['type']}")
+
+    return getattr(schemas, cls_name)(**data)
