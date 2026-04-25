@@ -54,7 +54,7 @@ F&B Genie democratises high-level business intelligence. Instead of passively an
 - **Google Places API** — live competitor scanning within 1km radius
 - **Google Geocoding API** — location string → lat/lng conversion
 - **Google Calendar API** — schedule field investigation tasks
-- **Gemini (gemini-2.5-flash)** — core AI reasoning engine
+- **Gemini (gemini-3.0-flash-preview)** — core AI reasoning engine
 - **fpdf2** — PDF feasibility report generation
 ### Infrastructure
 - **Vercel** — frontend deployment
