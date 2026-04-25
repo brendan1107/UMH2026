@@ -32,11 +32,11 @@ F&B Genie democratises high-level business intelligence. Instead of passively an
  
 | Name | Role |
 |---|---|
-| Wei Yi | AI Engineer |
-| Louis | Frontend + Backend  |
-| LiangYao | Backend |
-| FangYee | AI Engineer |
-| Brendan (Leader)| Backend |
+| Teng Wei Yi | AI Engineer |
+| Louis Lau Sie Yuan | Frontend + Backend  |
+| Tan Liang Yao | Backend |
+| Wong Fang Yee | AI Engineer |
+| Brendan Lee Cheng Jun | Backend |
  
 ---
  
@@ -78,7 +78,7 @@ context_builder.py — assemble fact sheet + conversation history
 prompts_templates.py — build_agent_prompt() with current phase + known facts
      │
      ▼
-glm_client.py — Z.AI Gemini API call with retry logic
+glm_client.py — Gemini API call with retry logic
      │
      ▼
 response_parser.py — parse + validate JSON output
