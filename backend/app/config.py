@@ -62,7 +62,8 @@ class Settings(BaseSettings):
         return value
 
     class Config:
-        env_file = ".env"
+        # Load the repo's backend env file while keeping .env as the local override.
+        env_file = (".env.backend", ".env")
         env_file_encoding = "utf-8"
 
 
