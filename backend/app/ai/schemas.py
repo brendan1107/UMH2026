@@ -69,7 +69,7 @@ class RiskItem(BaseModel):
 class AuditResult(BaseModel):
     risks: list[RiskItem]      # always exactly 3
 
-# ── Business case (mirrors Supabase table) ─────────────────
+# ── Business case (mirrors firebase table) ─────────────────
 class BusinessCase(BaseModel):
     id: str
     idea: str
