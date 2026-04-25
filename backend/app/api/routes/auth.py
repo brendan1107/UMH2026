@@ -1,7 +1,9 @@
 """
 Authentication Routes
 
-Handles user registration, login, and token management.
+Handles user authentication verification and session management.
+Firebase Auth is handled on the frontend — these endpoints verify tokens
+and sync user profile data to Firestore.
 """
 # What is route?
 # A route in a web application is an endpoint that defines how the application responds 
@@ -12,33 +14,94 @@ Handles user registration, login, and token management.
 # such as a success message or an authentication token.
 
 # This file defines the API endpoints for user authentication, including:
-# - /register: Endpoint for creating a new user account.
-# - /login: Endpoint for authenticating a user and returning a JWT token.
-# - /logout: Endpoint for logging out a user (this may involve token invalidation or session management).
+# - /me: Returns the current authenticated user's profile.
+# - /session: Syncs the frontend Firebase Auth user to Firestore.
+# - /register, /login, /logout: Placeholder endpoints for future custom auth flows.
 
-# For example when a user wants to create a new account, they would send a POST request to the /register endpoint with their registration details (like email and password). The register function would then handle the logic for creating the user in the database and returning a success response. When a user wants to log in, they would send a POST request to the /login endpoint with their credentials. The login function would verify the credentials, generate a JWT token if they are valid, and return that token to the user. Finally, when a user wants to log out, they would send a POST request to the /logout endpoint, and the logout function would handle any necessary cleanup, such as invalidating the user's session or token. These endpoints allow users to securely manage their authentication and access to the application.
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from google.cloud import firestore
 
 from app.db.session import get_db
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.utils.helpers import snake_dict_to_camel
 
 router = APIRouter()
 
+
+@router.get("/me")
+async def get_me(user: dict = Depends(get_current_user)):
+    """Return the current authenticated user's token claims."""
+    return {
+        "uid": user.get("uid"),
+        "email": user.get("email"),
+        "name": user.get("name") or user.get("displayName"),
+    }
+
+
+@router.post("/session")
+async def sync_session(
+    db: firestore.Client = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Sync the authenticated user's profile to Firestore.
+
+    Called by the frontend after login to ensure the user document exists.
+    Creates the user doc if it doesn't exist, or updates the last login time.
+    """
+    uid = user["uid"]
+    user_ref = db.collection(User.COLLECTION).document(uid)
+    user_doc = user_ref.get()
+
+    now = datetime.utcnow()
+
+    if user_doc.exists:
+        user_ref.update({"updated_at": now})
+    else:
+        new_user = User(
+            uid=uid,
+            email=user.get("email", ""),
+            full_name=user.get("name") or user.get("displayName"),
+            created_at=now,
+            updated_at=now,
+        )
+        user_ref.set(new_user.to_dict())
+
+    return {"status": "ok", "uid": uid}
+
+
 @router.post("/register")
 async def register(db=Depends(get_db)):
-    """Register a new user account."""
-    # TODO: Implement user registration
-    pass
+    """Register a new user account.
+
+    NOTE: User registration is handled by Firebase Auth on the frontend.
+    This endpoint is a placeholder for any future custom registration logic.
+    """
+    raise HTTPException(
+        status_code=501,
+        detail="Registration is handled by Firebase Auth on the frontend.",
+    )
 
 
 @router.post("/login")
 async def login(db=Depends(get_db)):
-    """Authenticate user and return JWT token."""
-    # TODO: Implement login with JWT
-    pass
+    """Authenticate user and return JWT token.
+
+    NOTE: Login is handled by Firebase Auth on the frontend.
+    Use POST /auth/session to sync after login.
+    """
+    raise HTTPException(
+        status_code=501,
+        detail="Login is handled by Firebase Auth on the frontend. Use POST /auth/session to sync.",
+    )
 
 
 @router.post("/logout")
 async def logout():
-    """Invalidate user session."""
-    # TODO: Implement logout
-    pass
+    """Invalidate user session.
+
+    NOTE: Logout is handled by Firebase Auth on the frontend.
+    """
+    return {"status": "ok", "message": "Session invalidated on client side."}

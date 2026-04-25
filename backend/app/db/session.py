@@ -40,13 +40,9 @@ def get_db():
 
 
 def get_storage_bucket():
-    """Return the Firebase Storage bucket instance."""
-    if bucket is None:
-        detail = "Firebase Storage is not configured"
-        if firebase_initialization_error is not None:
-            detail = str(firebase_initialization_error)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=detail,
-        )
+    """Return the Firebase Storage bucket instance, or None if unavailable.
+
+    Routes that need Storage should handle a None return gracefully
+    (e.g. metadata-only fallback for uploads).
+    """
     return bucket

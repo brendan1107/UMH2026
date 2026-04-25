@@ -19,7 +19,7 @@ class BusinessCase:
     user_id: str = ""  # Firebase Auth UID
     title: str = ""
     description: Optional[str] = None
-    mode: str = "pre_launch"  # pre_launch | existing_business
+    stage: str = "new"  # new | existing
     business_type: Optional[str] = None  # e.g., "western food", "cafe"
     target_location: Optional[str] = None
     status: str = "active"
@@ -31,7 +31,7 @@ class BusinessCase:
             "user_id": self.user_id,
             "title": self.title,
             "description": self.description,
-            "mode": self.mode,
+            "stage": self.stage,
             "business_type": self.business_type,
             "target_location": self.target_location,
             "status": self.status,
@@ -46,7 +46,7 @@ class BusinessCase:
             user_id=data.get("user_id", ""),
             title=data.get("title", ""),
             description=data.get("description"),
-            mode=data.get("mode", "pre_launch"),
+            stage=data.get("stage", data.get("mode", "new")),
             business_type=data.get("business_type"),
             target_location=data.get("target_location"),
             status=data.get("status", "active"),

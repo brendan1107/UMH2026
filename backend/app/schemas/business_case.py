@@ -14,16 +14,26 @@ from datetime import datetime
 class CaseCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    mode: str = "pre_launch"  # pre_launch | existing_business
+    stage: str = "new"  # new | existing
     business_type: Optional[str] = None
     target_location: Optional[str] = None
+
+
+class CaseUpdate(BaseModel):
+    """Fields the client is allowed to update on a case."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    stage: Optional[str] = None
+    business_type: Optional[str] = None
+    target_location: Optional[str] = None
+    status: Optional[str] = None
 
 
 class CaseResponse(BaseModel):
     id: str
     title: str
     description: Optional[str]
-    mode: str
+    stage: str
     business_type: Optional[str]
     target_location: Optional[str]
     status: str
