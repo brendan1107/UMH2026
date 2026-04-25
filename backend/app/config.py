@@ -8,9 +8,18 @@ for database, AI model, and external API configurations.
 # What is config.py for?
 # The config.py file is responsible for loading environment variables and providing a structured, typed configuration for our application. It defines a Settings class using Pydantic's BaseSettings, which allows us to easily manage and access our application's configuration settings throughout the codebase. This includes settings for Firebase, the GLM AI model, Google API keys, authentication parameters, and CORS allowed origins. By centralizing our configuration in this file, we can keep our code organized and make it easier to manage different environments (development, staging, production) by simply changing the environment variables without needing to modify the code. This approach promotes clean code and makes it easier to maintain and update our application's configuration as needed.
 
+from pathlib import Path
+from typing import List
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from typing import List
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+EXPECTED_FIREBASE_STORAGE_BUCKET = "fb-genie.firebasestorage.app"
+LEGACY_FIREBASE_STORAGE_BUCKETS = {
+    "fb-genie.appspot.com",
+    "gs://fb-genie.appspot.com",
+}
 
 
 class Settings(BaseSettings):
@@ -45,6 +54,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # --- Dev ---
+    # Set to "true" to bypass Firebase Auth token verification in development.
+    # MUST be disabled (default) in production.
+    DEV_AUTH_BYPASS: bool = False
+
     # --- CORS ---
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -61,9 +75,30 @@ class Settings(BaseSettings):
             return False
         return value
 
+    @field_validator("FIREBASE_STORAGE_BUCKET", mode="before")
+    @classmethod
+    def normalize_storage_bucket(cls, value):
+        """Use the actual Firebase Storage bucket name shown in this project."""
+        if not isinstance(value, str):
+            return value
+
+        bucket = value.strip()
+        if bucket.startswith("gs://"):
+            bucket = bucket.removeprefix("gs://")
+
+        if bucket in LEGACY_FIREBASE_STORAGE_BUCKETS:
+            return EXPECTED_FIREBASE_STORAGE_BUCKET
+
+        return bucket
+
     class Config:
         # Load the repo's backend env file while keeping .env as the local override.
-        env_file = (".env.backend", ".env")
+        # Note: actual file on disk is 'env.backend' (no leading dot).
+        env_file = (
+            str(BACKEND_DIR / "env.backend"),
+            str(BACKEND_DIR / ".env.backend"),
+            str(BACKEND_DIR / ".env"),
+        )
         env_file_encoding = "utf-8"
 
 

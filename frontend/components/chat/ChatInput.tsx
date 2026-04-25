@@ -1,14 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface ChatInputProps {
   onSendMessage: (content: string) => void;
+  onFileUpload?: (file: File) => void;
   disabled?: boolean;
 }
 
-export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
+const BLOCKED_PATTERNS = [
+  "firebase-service-account",
+  "service-account",
+  ".env",
+  "env.backend",
+  "credentials.json",
+];
+
+const BLOCKED_EXTENSIONS = [".pem", ".key", ".p12", ".pfx"];
+
+const ALLOWED_EXTENSIONS = [
+  ".png", ".jpg", ".jpeg", ".webp",
+  ".pdf", ".doc", ".docx", ".ppt", ".pptx",
+  ".csv", ".xls", ".xlsx"
+];
+
+export default function ChatInput({ onSendMessage, onFileUpload, disabled }: ChatInputProps) {
   const [input, setInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const validateFile = (file: File): boolean => {
+    const filename = file.name.toLowerCase();
+
+    if (BLOCKED_PATTERNS.some(pattern => filename.includes(pattern)) ||
+        BLOCKED_EXTENSIONS.some(ext => filename.endsWith(ext))) {
+      alert("Sensitive configuration or credential files cannot be uploaded as evidence.");
+      return false;
+    }
+
+    if (!ALLOWED_EXTENSIONS.some(ext => filename.endsWith(ext))) {
+      alert(`Unsupported file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,14 +52,33 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     setInput("");
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0 && onFileUpload) {
+      const file = e.target.files[0];
+      if (validateFile(file)) {
+        onFileUpload(file);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <div className="p-4 bg-white  border-t border-slate-200  transition-colors">
       <div className="max-w-3xl mx-auto relative">
-        <form onSubmit={handleSubmit} className="relative flex items-end gap-2 bg-white  border border-slate-300  rounded-xl shadow-sm focus-within:ring-1 focus-within:ring-slate-900  focus-within:border-slate-900  p-2 transition-colors">
+        <form onSubmit={handleSubmit} className="relative flex items-end gap-2 bg-white border border-slate-200 rounded-xl shadow-sm focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-100 p-2 transition-colors">
           
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+          />
           <button 
             type="button" 
-            disabled={disabled}
+            disabled={disabled || !onFileUpload}
+            onClick={() => fileInputRef.current?.click()}
             className="p-2 text-slate-400  hover:text-slate-600  transition-colors disabled:opacity-50"
             title="Attach file"
           >
@@ -38,7 +92,7 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             disabled={disabled}
             onChange={(e) => setInput(e.target.value)}
             placeholder={disabled ? "Session archived - Reopen to chat" : "Answer questions or provide more details..."}
-            className="flex-1 max-h-32 min-h-[44px] bg-transparent border-0 focus:ring-0 resize-none py-3 text-slate-900  placeholder-slate-400  text-sm custom-scrollbar disabled:cursor-not-allowed"
+            className="flex-1 max-h-32 min-h-[44px] bg-transparent border-0 outline-none ring-0 resize-none py-3 text-sm text-slate-900 placeholder-slate-400 focus:border-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed custom-scrollbar"
             rows={1}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

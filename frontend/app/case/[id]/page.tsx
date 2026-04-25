@@ -22,8 +22,19 @@ import {
   uploadsService, 
   verdictService,
   ChatMessage,
-  BusinessCase
+  BusinessCase,
+  EvidenceUpload
 } from "../../../lib/api";
+
+const toStoredUploadedFiles = (uploads: EvidenceUpload[]): UploadedFile[] =>
+  uploads
+    .filter((upload) => Boolean(upload.storagePath))
+    .map((upload) => ({
+      id: upload.id,
+      name: upload.name || upload.fileName || "Uploaded file",
+      size: upload.size,
+      type: upload.type
+    }));
 
 export default function CaseWorkspace() {
   const params = useParams();
@@ -64,17 +75,18 @@ export default function CaseWorkspace() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [caseData, messagesData, tasksData] = await Promise.all([
+        const [caseData, messagesData, tasksData, uploadsData] = await Promise.all([
           casesService.getCaseById(id),
           chatService.getMessages(id, "default_session"),
-          tasksService.getTasks(id)
+          tasksService.getTasks(id),
+          uploadsService.listUploads(id)
         ]);
 
         setCaseDetails(caseData);
         setSessionStatus(caseData.status as any);
         setMessages(messagesData);
-        // Map backend tasks to frontend Task format if necessary
         setTasks(tasksData as any);
+        setFiles(toStoredUploadedFiles(uploadsData));
 
         try {
           const recData = await reportsService.getLatestRecommendation(id);
@@ -211,14 +223,12 @@ export default function CaseWorkspace() {
   const handleFileUpload = async (file: File) => {
     try {
       const uploaded = await uploadsService.uploadFile(id, file);
-      const newFile: UploadedFile = {
-        id: uploaded.id,
-        name: uploaded.name,
-        size: uploaded.size,
-        type: uploaded.type
-      };
-      
-      setFiles((prev) => [...prev, newFile]);
+      if (uploaded.storageMode !== "firebase_storage" || !uploaded.storagePath) {
+        throw new Error("Upload did not complete in Firebase Storage.");
+      }
+
+      const uploadsData = await uploadsService.listUploads(id);
+      setFiles(toStoredUploadedFiles(uploadsData));
 
       // Automatically complete "Upload floor plan" task if it exists and is pending
       const uploadTask = tasks.find(t => t.type === "upload_file" && t.status === "pending");
@@ -229,6 +239,17 @@ export default function CaseWorkspace() {
       }
     } catch (error) {
       console.error("Failed to upload file", error);
+      alert("Failed to upload file to Firebase Storage. Please try again.");
+    }
+  };
+
+  const handleFileDelete = async (fileId: string) => {
+    try {
+      await uploadsService.deleteUpload(id, fileId);
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    } catch (error) {
+      console.error("Failed to delete file", error);
+      alert("Failed to delete file. Please try again.");
     }
   };
 
@@ -258,7 +279,11 @@ export default function CaseWorkspace() {
           onTaskAction={handleTaskActionClick} 
         />
       </div>
-      <UploadPanel files={files} onFileUpload={handleFileUpload} />
+      <UploadPanel
+        files={files}
+        onFileUpload={handleFileUpload}
+        onFileDelete={handleFileDelete}
+      />
     </div>
   );
 
@@ -293,7 +318,11 @@ export default function CaseWorkspace() {
         
         {/* Input Area */}
         <div className="shrink-0">
-          <ChatInput onSendMessage={handleSendMessage} disabled={sessionStatus === "archived"} />
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleFileUpload}
+            disabled={sessionStatus === "archived"}
+          />
         </div>
       </div>
       <TaskActionModal 
