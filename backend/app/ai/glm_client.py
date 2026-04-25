@@ -43,11 +43,16 @@ def _get_glm_config() -> tuple[str, str, str]:
 
     return base_url, api_key, model
 
+
 async def glm_call(
     messages: list[dict],
     system: str,
 ) -> AgentOutput:
     base_url, api_key, model = _get_glm_config()
+
+    # Filter out empty messages — API rejects them
+    messages = [m for m in messages if m.get("content", "").strip()]
+
     payload = {
         "model": model,
         "messages": [
@@ -55,7 +60,7 @@ async def glm_call(
             *messages,
         ],
         "temperature": 0.2,
-        "max_tokens": 2000,
+        "max_tokens": 5000,
     }
 
     async with httpx.AsyncClient(timeout=60, http2=False) as client:
@@ -84,10 +89,12 @@ async def glm_call(
 
         raw = resp.json()
 
-    content = raw["choices"][0]["message"]["content"]
+    # Safely get content — handle null or missing key
+    message = raw["choices"][0]["message"]
+    content = message.get("content")
 
-    if content is None:
-        raise ValueError(f"GLM returned null content. Full response: {raw}")
+    if not content or not content.strip():
+        raise ValueError(f"GLM returned empty content. Full response: {raw}")
 
     content = content.strip()
     if content.startswith("```"):
