@@ -96,3 +96,7 @@ class BusinessCase(BaseModel):
     phase: Phase
     fact_sheet: dict[str, Any]   # grows as tools return data
     messages: list[dict]          # full GLM conversation history
+    market_context: Optional[str] = None
+    tasks: Optional[list[dict[str, Any]]] = None
+    location_analysis: Optional[dict[str, Any]] = None
+    case_inputs: Optional[list[dict[str, Any]]] = None

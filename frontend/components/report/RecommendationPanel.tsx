@@ -29,7 +29,7 @@ export default function RecommendationPanel({
   onEndSessionClick,
   onReopenSessionClick
 }: RecommendationPanelProps) {
-  if (data.status === "gathering") {
+  if (data.status === "gathering" && (!data.summary || data.summary.includes("Waiting for enough data"))) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 text-slate-500">
         <svg className="w-8 h-8 animate-spin text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

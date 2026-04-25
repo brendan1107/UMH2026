@@ -32,3 +32,6 @@ Thumbs.db
 *.swp
 *.swo
 backend/env.backend
+
+
+.env.backend

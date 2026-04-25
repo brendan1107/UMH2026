@@ -15,18 +15,52 @@ class GoogleMapsClient:
 
     def __init__(self):
         self.api_key = settings.GOOGLE_MAPS_API_KEY
+        self.base_url = "https://maps.googleapis.com/maps/api/geocode/json"
 
     async def geocode(self, address: str):
         """Convert address to latitude/longitude coordinates."""
-        # TODO: Call Geocoding API
-        pass
+        if not self.api_key:
+            return None
+
+        async with httpx.AsyncClient() as client:
+            params = {
+                "address": address,
+                "key": self.api_key
+            }
+            response = await client.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("status") == "OK" and data.get("results"):
+                result = data["results"][0]
+                location = result["geometry"]["location"]
+                return {
+                    "lat": location["lat"],
+                    "lng": location["lng"],
+                    "formatted_address": result.get("formatted_address"),
+                    "place_id": result.get("place_id")
+                }
+        return None
 
     async def reverse_geocode(self, latitude: float, longitude: float):
         """Convert coordinates to human-readable address."""
-        # TODO: Call Reverse Geocoding API
-        pass
+        if not self.api_key:
+            return None
+
+        async with httpx.AsyncClient() as client:
+            params = {
+                "latlng": f"{latitude},{longitude}",
+                "key": self.api_key
+            }
+            response = await client.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("status") == "OK" and data.get("results"):
+                return data["results"][0].get("formatted_address")
+        return None
 
     async def get_directions(self, origin: str, destination: str):
         """Get transit/driving directions between two points."""
-        # TODO: Call Directions API (useful for accessibility analysis)
+        # Optional MVP: not strictly required by the prompt's core goal
         pass

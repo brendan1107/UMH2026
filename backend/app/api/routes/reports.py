@@ -52,10 +52,42 @@ async def get_report(
         data["id"] = doc.id
         return snake_dict_to_camel(data)
 
-    # No report found yet — return a "gathering" status
+    # No official report found yet — return a location-aware summary if available
+    doc = case_ref.get()
+    case_data = doc.to_dict()
+    
+    if case_data.get("latest_location_analysis_id"):
+        risk_level = case_data.get("latest_market_risk_level")
+        risk_score = case_data.get("latest_market_risk_score")
+        competitor_count = case_data.get("latest_competitor_count")
+        strong_threats = case_data.get("latest_strong_competitor_count")
+        resolved_name = case_data.get("latest_resolved_location_name")
+        summary = case_data.get("latest_market_summary")
+
+        return snake_dict_to_camel({
+            "status": "gathering",
+            "summary": f"Location Intelligence for {resolved_name} is ready. {summary}",
+            "executive_summary": f"{resolved_name} shows a {risk_level} market risk ({risk_score}/10) with {competitor_count} nearby competitors and {strong_threats} high-rated threats.",
+            "strengths": [
+                "Detailed location intelligence gathered",
+                f"Resolved exact address: {case_data.get('latest_resolved_address')}",
+                "Competitor density mapped"
+            ],
+            "risks": [
+                f"Market risk level is {risk_level}",
+                f"{strong_threats} strong competitors within walking distance",
+                "Market saturated with similar concepts" if risk_level == "High" else "Unverified demand in low-density area"
+            ],
+            "next_steps": [
+                "Define target customer segment",
+                "Compare competitor pricing",
+                "Analyze unique value proposition"
+            ]
+        })
+
     return {
         "status": "pending",
-        "summary": "No report generated yet. Please complete the investigation.",
+        "summary": "No report generated yet. Please run Market Analysis or talk to AI to gather data.",
     }
 
 

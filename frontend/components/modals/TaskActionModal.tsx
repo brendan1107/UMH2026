@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Task } from "../tasks/TaskList";
+import { InvestigationTask } from "../../lib/api/types";
+type Task = InvestigationTask;
 
 const defaultCenter = { lat: 37.7749, lng: -122.4194 };
 const googleMapsScriptId = "google-maps-js-api";
@@ -284,6 +285,26 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
+  useEffect(() => {
+    if (isOpen && task) {
+      const val = task.submittedValue as any;
+      if (val) {
+        if (task.type === "provide_text_input" || task.type === "review_ai_suggestions") setTextInput(val.text || "");
+        if (task.type === "answer_questions") setAnswers(val.answers || {});
+        if (task.type === "choose_option") setSelectedOption(val.selectedOption || null);
+        if (task.type === "select_location") setLocation(val.location || null);
+        if (task.type === "schedule_event") setEventDate(val.eventDate || "");
+      } else {
+        // Reset if no submitted value
+        setTextInput("");
+        setAnswers({});
+        setSelectedOption(null);
+        setLocation(null);
+        setEventDate("");
+      }
+    }
+  }, [isOpen, task]);
+
   if (!task) return null;
   const taskData = getTaskData(task);
 
@@ -311,7 +332,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
     }
   };
 
-  const submitAction = async () => {
+  const submitAction = async (status: string = "completed") => {
     let submitData: TaskActionData = {};
     if (task.type === "provide_text_input") submitData = { text: textInput };
     if (task.type === "answer_questions") submitData = { answers };
@@ -337,7 +358,9 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
       setIsUploadingFile(false);
     }
     
-    onSubmit(task.id, submitData);
+    // Pass status in payload if possible or via a wrapped data structure
+    // Since onSubmit signature is (taskId, actionData), we might need to wrap it
+    onSubmit(task.id, { ...submitData, status } as any);
     
     // Reset state
     setTextInput("");
@@ -351,7 +374,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    void submitAction();
+    void submitAction("completed");
   };
 
   const renderContent = () => {
@@ -394,17 +417,20 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
         );
 
       case "answer_questions":
-        const questions = taskData.questions || [];
+        const rawQuestions = taskData.questions || (task as any).questions || [];
+        const normalizedQuestions = rawQuestions.map((q: any) => 
+          typeof q === 'string' ? { id: q, label: q } : q
+        );
         return (
           <div className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">{taskData.description || "Please provide some additional details:"}</p>
-            {questions.map((q) => (
+            {normalizedQuestions.map((q: any) => (
               <div key={q.id}>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{q.label}</label>
                 <textarea
                   value={answers[q.id] || ""}
                   onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
-                  placeholder={q.placeholder}
+                  placeholder={q.placeholder || "Type your answer here..."}
                   className="w-full bg-white border border-slate-300 rounded-lg p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 text-sm min-h-[80px]"
                 />
               </div>
@@ -547,7 +573,9 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
                 <span className="text-xs text-slate-500">Requires Google Calendar permission</span>
                 <button type="button" className="text-xs text-blue-600 hover:text-blue-800 font-medium" onClick={async () => {
                   try {
-                    const response = await fetch("http://127.0.0.1:8000/api/calendar/auth/url");
+                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+                    const domain = baseUrl.replace(/\/api$/, '');
+                    const response = await fetch(`${domain}/api/calendar/auth/url`);
                     const data = await response.json();
                     if (data.auth_url) {
                       window.open(data.auth_url, "_blank");
@@ -619,22 +647,31 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFil
                 {renderContent()}
               </form>
 
-              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
                 <button
                   type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  onClick={() => void submitAction("pending")}
+                  className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
                 >
-                  Cancel
+                  Save as Draft
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void submitAction()}
-                  disabled={isSubmitDisabled()}
-                  className="px-6 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Save Action
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitAction("completed")}
+                    disabled={isSubmitDisabled()}
+                    className="px-6 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {task.status === 'completed' ? 'Update Answer' : 'Complete Task'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

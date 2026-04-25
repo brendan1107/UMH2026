@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [cases, setCases] = useState<BusinessCase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const currentUser = auth.currentUser;
 
@@ -22,18 +23,27 @@ export default function DashboardPage() {
   const [editTitle, setEditTitle] = useState("");
   const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchCases = async () => {
-      try {
-        if (!currentUser) return;
-        const data = await casesService.getCases();
-        setCases(data);
-      } catch (err) {
-        console.error("Failed to load cases", err);
-      } finally {
-        setIsLoading(false);
+  const fetchCases = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!currentUser) return;
+      const data = await casesService.getCases();
+      setCases(data);
+    } catch (err) {
+      console.error("Failed to load cases", err);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("failed to fetch")) {
+        setError("Could not connect to backend. Make sure the backend server is running at http://127.0.0.1:8000.");
+      } else {
+        setError(msg);
       }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCases();
   }, [currentUser]);
 
@@ -121,7 +131,25 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {isLoading ? (
+        {error ? (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center max-w-2xl mx-auto">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-red-900 mb-2">Connection Error</h3>
+            <p className="text-red-700 mb-6 text-sm">
+              {error}
+            </p>
+            <button 
+              onClick={fetchCases}
+              className="inline-flex items-center justify-center px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+        ) : isLoading ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
           </div>
