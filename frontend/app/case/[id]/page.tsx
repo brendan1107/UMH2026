@@ -49,6 +49,9 @@ export default function CaseWorkspace() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isEndSessionModalOpen, setIsEndSessionModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Staged tasks state
+  const [stagedTaskActions, setStagedTaskActions] = useState<Record<string, any>>({});
 
   const currentUser = auth.currentUser;
 
@@ -130,29 +133,52 @@ export default function CaseWorkspace() {
   const handleTaskActionSubmit = async (taskId: string, actionData: any) => {
     setIsTaskModalOpen(false);
     
-    try {
-      // 1. Mark task as completed on backend
-      await tasksService.updateTask(taskId, "completed");
-      handleTaskUpdate(taskId, "completed");
-      
-      // 2. Generate a user message based on the action
-      let content = "I've completed the task.";
-      if (activeTask?.type === "choose_option") {
-        const option = activeTask.data?.options?.find((o: any) => o.id === actionData.selectedOption);
-        content = `I have selected the option: ${option?.title || actionData.selectedOption}.`;
-      } else if (activeTask?.type === "answer_questions") {
-        content = "I have provided the requested details in the form.";
-      } else if (activeTask?.type === "provide_text_input") {
-        content = `Here is my input: ${actionData.text}`;
-      }
-
-      // 3. Send message
-      await handleSendMessage(content);
-    } catch (error) {
-      console.error("Failed to submit task action", error);
-    }
+    // Save the action locally
+    setStagedTaskActions(prev => ({ ...prev, [taskId]: actionData }));
     
+    // Optimistically mark as completed in UI
+    handleTaskUpdate(taskId, "completed");
     setActiveTask(null);
+  };
+
+  const handleSubmitAllTasks = async () => {
+    const tasksToSubmit = Object.entries(stagedTaskActions);
+    if (tasksToSubmit.length === 0) return;
+
+    try {
+      let contents = [];
+      for (const [taskId, actionData] of tasksToSubmit) {
+        // Mark task as completed on backend
+        await tasksService.updateTask(taskId, "completed");
+        
+        const task = tasks.find(t => t.id === taskId);
+        let content = `I've completed the task: ${task?.title || taskId}.`;
+        
+        if (task?.type === "choose_option") {
+          const option = task.data?.options?.find((o: any) => o.id === actionData.selectedOption);
+          content += `\nSelected option: ${option?.title || actionData.selectedOption}.`;
+        } else if (task?.type === "answer_questions") {
+          content += "\nProvided details:\n";
+          for (const [qId, ans] of Object.entries(actionData.answers || {})) {
+            const q = task.data?.questions?.find((q: any) => q.id === qId);
+            content += `- ${q?.label || qId}: ${ans}\n`;
+          }
+        } else if (task?.type === "provide_text_input") {
+          content += `\nInput: ${actionData.text}`;
+        } else if (task?.type === "select_location") {
+          content += `\nSelected location: ${actionData.location?.address} (${actionData.location?.lat}, ${actionData.location?.lng})`;
+        } else if (task?.type === "schedule_event") {
+          content += `\nScheduled event for: ${actionData.eventDate}`;
+        }
+        contents.push(content);
+      }
+      
+      const finalContent = contents.join("\n\n");
+      await handleSendMessage(finalContent);
+      setStagedTaskActions({});
+    } catch (error) {
+      console.error("Failed to submit staged tasks", error);
+    }
   };
 
   const handleGenerateVerdict = async () => {
@@ -257,6 +283,19 @@ export default function CaseWorkspace() {
           }} 
           onTaskAction={handleTaskActionClick} 
         />
+        {Object.keys(stagedTaskActions).length > 0 && (
+          <div className="px-4 pb-4">
+            <button 
+              onClick={handleSubmitAllTasks}
+              className="w-full py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 shadow-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <span>Submit All Completed Tasks</span>
+              <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">
+                {Object.keys(stagedTaskActions).length}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
       <UploadPanel files={files} onFileUpload={handleFileUpload} />
     </div>
