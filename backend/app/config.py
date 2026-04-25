@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # --- Firebase ---
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_CREDENTIALS_PATH: str = "firebase-service-account.json"
+    FIREBASE_PRIVATE_KEY_ID: str = ""
+    FIREBASE_PRIVATE_KEY: str = ""
+    FIREBASE_CLIENT_EMAIL: str = ""
+    FIREBASE_CLIENT_ID: str = ""
     FIREBASE_STORAGE_BUCKET: str = ""
 
 
