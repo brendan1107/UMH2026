@@ -36,7 +36,7 @@ F&B Genie democratises high-level business intelligence. Instead of passively an
 | Louis Lau Sie Yuan | Frontend + Backend  |
 | Tan Liang Yao | Backend |
 | Wong Fang Yee | AI Engineer |
-| Brendan Lee Cheng Jun | Backend |
+| Brendan Lee Cheng Jun | Project Manager|
  
 ---
  
