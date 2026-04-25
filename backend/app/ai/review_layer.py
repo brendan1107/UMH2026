@@ -21,7 +21,9 @@ ZAI_KEY  = os.getenv("GLM_API_KEY", "")
 
 async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
     # 1. Define the model explicitly here!
-    model_name = os.getenv("GLM_MODEL_NAME", "ilmu-glm-5.1")
+
+    # replace with gemini model for better performance
+    model_name = os.getenv("GLM_MODEL_NAME", "gemini-2.5-flash")
 
     user_content = json.dumps({
         "business_plan_summary": plan_summary,
@@ -42,9 +44,11 @@ async def run_audit(case: BusinessCase, plan_summary: str) -> AuditResult:
                     {"role": "user",   "content": user_content},
                 ],
                 "temperature": 0.2,
-                "max_tokens": 2500,
+                "max_tokens": 5000,
             },
         )
+        if resp.status_code != 200:
+            raise RuntimeError(f"Gemini API Error: {resp.text}")
         resp.raise_for_status()
 
     # 1. Safely parse the raw JSON first
