@@ -86,9 +86,7 @@ async def create_session(
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     if not case_ref.get().exists:
         raise HTTPException(status_code=404, detail="Case not found")
-    service = ChatService(db)
-    return await service.create_session(case_id)
-
+        
     session = ChatSession(case_id=case_id)
     session_dict = session.to_dict()
 
@@ -115,13 +113,8 @@ async def list_sessions(
         data["id"] = doc.id
         sessions.append(snake_dict_to_camel(data))
 
-        sessions.append(data)
     return sessions
 
-# keep create_session, list_sessions, get_messages unchanged 
-# only fix this send_message function to run the agent and save AI response as a message in Firestore
-# The AI response should also be saved in the case document for context management and future retrieval. 
-# The AI output should be formatted into a human-readable string for the chat message content, and the raw AI output data should be included in the message document for frontend rendering.:
 
 @router.post("/{case_id}/sessions/{session_id}/messages")
 async def send_message(
@@ -131,7 +124,7 @@ async def send_message(
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    """Send a message in a chat session. Stores user message and AI response."""
+    """Send a message in a chat session. Stores user message, image, and AI response."""
     case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
     case_doc = case_ref.get()
     if not case_doc.exists:
@@ -143,22 +136,40 @@ async def send_message(
 
     session_ref = case_ref.collection(ChatSession.SUBCOLLECTION).document(session_id)
 
-    # 1. Save user message to Firestore
+    # 1. Extract content and optional image URL from frontend payload
+    text_content = data.get("content", "")
+    image_url = data.get("image_url")
+
+    # 2. Save user message to Firestore (Including image_url for the UI to render)
     user_msg = ChatMessage(
         session_id=session_id,
         role="user",
-        content=data.get("content", "")
+        content=text_content
     )
+    user_msg_dict = user_msg.to_dict()
+    if image_url:
+        user_msg_dict["image_url"] = image_url
+
     user_msg_ref = session_ref.collection(ChatMessage.SUBCOLLECTION).document()
-    user_msg_ref.set(user_msg.to_dict())
+    user_msg_ref.set(user_msg_dict)
 
     # 3. Build AICase from Firestore data
     ai_case = _build_ai_case(case_id, case_data)
 
-    # 4. Append user message to AI conversation history
+    # 4. Format message for AI Conversation History (Multimodal support)
+    if image_url:
+        # If there's an image, pass it as a structured multimodal list
+        ai_msg_content = [
+            {"type": "text", "text": text_content},
+            {"type": "image_url", "image_url": {"url": image_url}}
+        ]
+    else:
+        # Otherwise, just pass the plain text
+        ai_msg_content = text_content
+
     ai_case.messages.append({
         "role": "user",
-        "content": data.get("content", "")
+        "content": ai_msg_content
     })
 
     # 5. Run one agent turn — GLM thinks and responds
@@ -175,7 +186,6 @@ async def send_message(
     # 7. Save AI output as a chat message
     ai_content = _format_output_for_chat(ai_output)
 
-    # Store AI response (placeholder for basic CRUD integration)
     ai_msg = ChatMessage(
         session_id=session_id,
         role="assistant",
@@ -186,14 +196,14 @@ async def send_message(
     ai_dict = ai_msg.to_dict()
     ai_dict["ai_output_type"] = ai_output.type   # so frontend knows what to render
     ai_dict["ai_output_data"] = ai_output.model_dump()
+    
     if ai_output.type == "field_task":
         ai_dict["created_task"] = _create_task_from_field_task(case_ref, case_id, ai_output)
+        
     ai_msg_ref.set(ai_dict)
-
-
     ai_dict["id"] = ai_msg_ref.id
+    
     return snake_dict_to_camel(ai_dict)
-
 
 
 def _format_output_for_chat(output) -> str:
@@ -207,7 +217,6 @@ def _format_output_for_chat(output) -> str:
     elif output.type == "verdict":
         return f"VERDICT: {output.decision}\n\n{output.summary}"
     return ""
-
 
 
 @router.get("/{case_id}/sessions/{session_id}/messages")
@@ -229,5 +238,3 @@ async def get_messages(
         messages.append(snake_dict_to_camel(data))
 
     return messages
-    service = ChatService(db)
-    return await service.get_session_history(case_id, session_id)
