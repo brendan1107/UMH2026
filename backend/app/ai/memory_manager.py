@@ -15,7 +15,7 @@ Keeps GLM context lean for long investigations.
 """
 
 from app.ai.schemas import BusinessCase
-from app.ai.prompt_templates import REQUIRED_FACTS
+from app.ai.prompts_templates import REQUIRED_FACTS
 
 
 class MemoryManager:
