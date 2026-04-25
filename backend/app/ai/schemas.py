@@ -1,7 +1,7 @@
 # all pydantic models for ai agent
 
 # app/ai/schemas.py
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, ConfigDict, Field, UUID4
 from typing import Any, Literal, Optional
 from datetime import datetime
 
@@ -21,28 +21,49 @@ class ToolCallOutput(BaseModel):
     args: dict[str, Any]
 
 class TaskOption(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     title: str
 
 class TaskQuestion(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     label: str
 
 class TaskDef(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     title: str
     instruction: str
-    ai_message: Optional[str] = None
-    follow_up_action: Optional[str] = None
-    evidence_type: Literal["count", "photo", "rating", "text", "location", "schedule", "decision", "questions"]
+    canonical_key: Optional[str] = Field(default=None, alias="canonicalKey")
+    ai_message: Optional[str] = Field(default=None, alias="aiMessage")
+    follow_up_action: Optional[str] = Field(default=None, alias="followUpAction")
+    evidence_type: Literal["count", "photo", "rating", "text", "location", "schedule", "decision", "questions"] = Field(default="text", alias="evidenceType")
     options: Optional[list[TaskOption]] = None
     questions: Optional[list[TaskQuestion]] = None
-    event_title: Optional[str] = None
-    event_duration: Optional[str] = None
+    event_title: Optional[str] = Field(default=None, alias="eventTitle")
+    event_duration: Optional[str] = Field(default=None, alias="eventDuration")
 
 class TaskBatchOutput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     type: Literal["task_batch"]
-    chat_message: Optional[str] = None
+    chat_message: Optional[str] = Field(default=None, alias="chatMessage")
     tasks: list[TaskDef]
+
+class FieldTaskOutput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["field_task"]
+    title: str
+    instruction: str
+    evidence_type: Literal["count", "photo", "rating", "text", "location", "schedule", "decision", "questions"] = Field(default="text", alias="evidenceType")
+    options: Optional[list[TaskOption]] = None
+    questions: Optional[list[TaskQuestion]] = None
+    event_title: Optional[str] = Field(default=None, alias="eventTitle")
+    event_duration: Optional[str] = Field(default=None, alias="eventDuration")
 
 class ClarifyOutput(BaseModel):
     type: Literal["clarify"]
@@ -56,8 +77,12 @@ class VerdictOutput(BaseModel):
     summary: str               # 2–3 sentence exec summary
     pivot_suggestion: Optional[str] = None  # only if PIVOT
 
+class TextOutput(BaseModel):
+    type: Literal["text"]
+    content: str
+
 # Union — every GLM response must be one of these
-AgentOutput = ToolCallOutput | TaskBatchOutput | ClarifyOutput | VerdictOutput
+AgentOutput = ToolCallOutput | TaskBatchOutput | FieldTaskOutput | ClarifyOutput | VerdictOutput | TextOutput
 
 # ── Tool return types ──────────────────────────────────────
 class CompetitorResult(BaseModel):
@@ -100,3 +125,5 @@ class BusinessCase(BaseModel):
     tasks: Optional[list[dict[str, Any]]] = None
     location_analysis: Optional[dict[str, Any]] = None
     case_inputs: Optional[list[dict[str, Any]]] = None
+    pending_input_key: Optional[str] = None
+    pending_input_question: Optional[str] = None

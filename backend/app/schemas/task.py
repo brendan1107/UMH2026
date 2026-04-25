@@ -16,6 +16,7 @@ class TaskCreate(BaseModel):
     type: str = "answer_questions"
     status: TaskStatus = "pending"
     action_label: Optional[str] = Field(default=None, alias="actionLabel")
+    canonical_key: Optional[str] = Field(default=None, alias="canonicalKey")
     data: dict[str, Any] = Field(default_factory=dict)
     source: str = "manual"
 
@@ -36,6 +37,7 @@ class TaskResponse(BaseModel):
     type: str = "answer_questions"
     status: TaskStatus = "pending"
     action_label: Optional[str] = None
+    canonical_key: Optional[str] = None
     data: dict[str, Any] = Field(default_factory=dict)
     source: str = "manual"
     submitted_value: Optional[Any] = None

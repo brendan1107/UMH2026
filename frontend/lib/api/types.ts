@@ -29,6 +29,7 @@ export type TaskType =
   | "upload_image" 
   | "provide_text_input" 
   | "review_ai_suggestions"
+  | "review_competitors"
   | "select_location"
   | "schedule_event";
 
@@ -58,6 +59,7 @@ export interface TaskCreatePayload {
   followUpAction?: string;
   data?: Record<string, unknown>;
   source?: string;
+  canonicalKey?: string;
 }
 
 export interface InvestigationTask {
@@ -74,6 +76,11 @@ export interface InvestigationTask {
   source?: string;
   questions?: string[];
   submittedValue?: TaskActionData;
+  locationAnalysisId?: string;
+  relatedLocationAnalysisId?: string;
+  responseText?: string;
+  structuredResponse?: any;
+  canonicalKey?: string;
   completedAt?: string;
   createdAt?: string;
   updatedAt?: string;

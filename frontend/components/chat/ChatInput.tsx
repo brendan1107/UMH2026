@@ -70,7 +70,7 @@ export default function ChatInput({ onSendMessage, onFileUpload, disabled, value
   };
 
   return (
-    <div className="p-4 bg-white  border-t border-slate-200  transition-colors">
+    <div className="p-4 bg-white border-t border-slate-200 transition-colors">
       <div className="max-w-3xl mx-auto relative">
         <form onSubmit={handleSubmit} className="relative flex items-end gap-2 bg-white border border-slate-200 rounded-xl shadow-sm focus-within:border-slate-300 focus-within:ring-2 focus-within:ring-slate-100 p-2 transition-colors">
           
@@ -84,7 +84,7 @@ export default function ChatInput({ onSendMessage, onFileUpload, disabled, value
             type="button" 
             disabled={disabled || !onFileUpload}
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-400  hover:text-slate-600  transition-colors disabled:opacity-50"
+            className="p-2 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
             title="Attach file"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -110,7 +110,7 @@ export default function ChatInput({ onSendMessage, onFileUpload, disabled, value
           <button 
             type="submit" 
             disabled={!input.trim() || disabled}
-            className="p-2 rounded-lg bg-slate-900  text-white  hover:bg-slate-800  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -118,7 +118,7 @@ export default function ChatInput({ onSendMessage, onFileUpload, disabled, value
           </button>
           
         </form>
-        <p className="text-center text-xs text-slate-400  mt-2">
+        <p className="text-center text-xs text-slate-400 mt-2">
           F&B Genie can make mistakes. Consider verifying important business assumptions.
         </p>
       </div>

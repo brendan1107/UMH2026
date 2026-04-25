@@ -41,9 +41,9 @@ class Settings(BaseSettings):
 
     # --- AI Model (GLM) ---
     GLM_API_KEY: str = ""
-    GLM_API_BASE_URL: str = ""
-    GLM_MODEL_NAME: str = "glm-4"
-    GLM_MAX_TOKENS: int = 4096
+    GLM_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    GLM_MODEL_NAME: str = "gemini-2.5-flash"
+    GLM_MAX_TOKENS: int = 5000
 
     # --- Google APIs ---
     GOOGLE_PLACES_API_KEY: str = ""
@@ -90,6 +90,16 @@ class Settings(BaseSettings):
             return False
         return value
 
+    @field_validator("GLM_MAX_TOKENS", mode="before")
+    @classmethod
+    def normalize_glm_max_tokens(cls, value):
+        """Keep Gemini's chat response budget aligned with the app expectation."""
+        try:
+            tokens = int(value)
+        except (TypeError, ValueError):
+            return 5000
+        return max(tokens, 5000)
+
     @field_validator("FIREBASE_STORAGE_BUCKET", mode="before")
     @classmethod
     def normalize_storage_bucket(cls, value):
@@ -118,3 +128,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Secure startup logging
+import logging
+logger = logging.getLogger(__name__)
+logger.info("--- Configuration Loaded ---")
+logger.info(f"APP_ENV: {settings.APP_ENV}")
+logger.info(f"GLM_API_KEY set: {bool(settings.GLM_API_KEY)}")
+logger.info(f"GLM_API_BASE_URL: {settings.GLM_API_BASE_URL}")
+logger.info(f"GLM_MODEL_NAME: {settings.GLM_MODEL_NAME}")
+logger.info(f"GLM_MAX_TOKENS: {settings.GLM_MAX_TOKENS}")
+logger.info("----------------------------")

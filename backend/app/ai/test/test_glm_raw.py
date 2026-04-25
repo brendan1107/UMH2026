@@ -1,18 +1,21 @@
 # test_glm_raw.py
 # Run with: python test_glm_raw.py
-import httpx, os, json
-from dotenv import load_dotenv
+import httpx, json
+import pytest
 
-load_dotenv()
+from app.config import settings
 
-ZAI_BASE = os.getenv("GLM_API_BASE_URL")  # ZAI endpoint
-ZAI_KEY  = os.getenv("GLM_API_KEY")
+ZAI_BASE = settings.GLM_API_BASE_URL.rstrip("/")
+ZAI_KEY = settings.GLM_API_KEY
+ZAI_MODEL = settings.GLM_MODEL_NAME
+
+pytestmark = pytest.mark.skipif(not ZAI_KEY, reason="GLM_API_KEY is not configured")
 
 def test_glm_connection():
     print("── Test 1: Basic connectivity ──")
 
     payload = {
-        "model": "ilmu-glm-5.1",
+        "model": ZAI_MODEL,
         "messages": [
             {"role": "user", "content": "Reply with exactly this JSON: {\"status\": \"alive\"}"}
         ],
@@ -31,7 +34,7 @@ def test_glm_connection():
 
     if resp.status_code != 200:
         print(f"FAIL — error body: {resp.text}")
-        return False
+        assert False, resp.text[:300]
 
     data = resp.json()
     content = data["choices"][0]["message"]["content"]
@@ -42,10 +45,10 @@ def test_glm_connection():
         parsed = json.loads(content.strip())
         print(f"Parsed JSON : {parsed}")
         print("PASS ✓ — GLM is reachable and responding\n")
-        return True
+        return
     except json.JSONDecodeError:
         print("WARN — GLM responded but not pure JSON (may need prompt tuning)\n")
-        return True   # connection works, prompt may need adjusting
+        return   # connection works, prompt may need adjusting
 
 
 def test_glm_model_info():
@@ -70,7 +73,7 @@ def test_glm_latency():
     import time
 
     payload = {
-        "model": "ilmu-glm-5.1",
+        "model": ZAI_MODEL,
         "messages": [{"role": "user", "content": "Say OK"}],
         "max_tokens": 5,
     }

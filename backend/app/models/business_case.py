@@ -36,6 +36,12 @@ class BusinessCase:
     fact_sheet: dict = field(default_factory=dict)
     ai_messages: list = field(default_factory=list)
 
+    # ── Pending Input State ──────────────────────────────────
+    # tracks if the assistant is waiting for a specific piece of data from the chat
+    pending_input_key: Optional[str] = None
+    pending_input_question: Optional[str] = None
+    pending_input_type: Optional[str] = None
+
     def to_dict(self) -> dict:
         return {
             "user_id": self.user_id,
@@ -52,6 +58,9 @@ class BusinessCase:
             "ai_phase": self.ai_phase,
             "fact_sheet": self.fact_sheet,
             "ai_messages": self.ai_messages,
+            "pending_input_key": self.pending_input_key,
+            "pending_input_question": self.pending_input_question,
+            "pending_input_type": self.pending_input_type,
         }
 
     @staticmethod
@@ -72,6 +81,9 @@ class BusinessCase:
             ai_phase=data.get("ai_phase", "INTAKE"),
             fact_sheet=data.get("fact_sheet", {}),
             ai_messages=data.get("ai_messages", []),
+            pending_input_key=data.get("pending_input_key"),
+            pending_input_question=data.get("pending_input_question"),
+            pending_input_type=data.get("pending_input_type"),
         )
 
     COLLECTION = "business_cases"

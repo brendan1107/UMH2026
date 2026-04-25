@@ -4,7 +4,9 @@
 import os, httpx
 from app.ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
 
-PLACES_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
+from app.config import settings
+
+PLACES_KEY = settings.GOOGLE_PLACES_API_KEY
 
 async def fetch_competitors(
     location: str,

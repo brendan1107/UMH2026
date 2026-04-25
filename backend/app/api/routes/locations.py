@@ -334,7 +334,13 @@ async def get_competitors(
         "case_id": case_id,
         "source": source,
         "fallback_reason": fallback_reason,
-        "analysis_mode": "fallback",
+        "analysis_mode": "gemini" if source == "google_places" else "fallback",
+        "resolved_name": target_name,
+        "resolved_address": target_address,
+        "resolved_lat": target_lat,
+        "resolved_lng": target_lng,
+        "resolved_place_id": target_place_id,
+        "resolved_google_maps_url": target_google_maps_url,
         "target_location": {
             "name": target_name,
             "lat": target_lat,
@@ -388,48 +394,45 @@ async def get_competitors(
                 doc_ref.set(result)
                 result["id"] = doc_ref.id
 
-                # 1. Deduplicated Task Creation
-                existing_tasks_docs = case_ref.collection("tasks").get()
-                existing_normalized = {normalize_title(t.to_dict().get("title", "")) for t in existing_tasks_docs}
+                from app.services.case_service import CaseService
+                service = CaseService()
                 
                 for task in result["suggested_tasks"]:
                     norm_title = normalize_title(task["title"])
-                    if norm_title not in existing_normalized:
-                        # Enhance specific tasks with the user's requested questions
-                        t_type = task["type"]
-                        t_questions = task.get("questions", [])
-                        
-                        if norm_title == normalize_title("Analyze Audience"):
-                            t_type = "answer_questions"
-                            t_questions = [
-                                {"id": "target_group", "label": "Who is your main customer group?", "placeholder": "e.g. University students, office workers..."},
-                                {"id": "value_prop", "label": "Why would they buy from you?", "placeholder": "e.g. Convenience, price, unique flavor..."},
-                                {"id": "budget", "label": "What budget are they comfortable with?", "placeholder": "e.g. RM 5-10, RM 15-20..."}
-                            ]
-                        elif norm_title == normalize_title("Review pricing strategy"):
-                            t_type = "answer_questions"
-                            t_questions = [
-                                {"id": "price_range", "label": "What is your expected drink price range?", "placeholder": "e.g. RM 8 - RM 12"},
-                                {"id": "positioning", "label": "Are you positioning as budget, mid-range, or premium?", "placeholder": "e.g. Mid-range"},
-                                {"id": "cost_per_unit", "label": "What is your estimated cost per drink?", "placeholder": "e.g. RM 3.50"},
-                                {"id": "competitor_compare", "label": "What nearby competitor price are you comparing against?", "placeholder": "e.g. Starbucks (RM 16), Local Kiosk (RM 7)"}
-                            ]
+                    
+                    # Enhance specific tasks with the user's requested questions
+                    t_type = task["type"]
+                    t_questions = task.get("questions", [])
+                    
+                    if norm_title == normalize_title("Analyze Audience") or norm_title == normalize_title("Analyze target audience"):
+                        t_type = "answer_questions"
+                        t_questions = [
+                            {"id": "target_group", "label": "Who is your main customer group?", "placeholder": "e.g. University students, office workers..."},
+                            {"id": "value_prop", "label": "Why would they buy from you?", "placeholder": "e.g. Convenience, price, unique flavor..."},
+                            {"id": "budget", "label": "What budget are they comfortable with?", "placeholder": "e.g. RM 5-10, RM 15-20..."}
+                        ]
+                    elif norm_title == normalize_title("Review pricing strategy"):
+                        t_type = "answer_questions"
+                        t_questions = [
+                            {"id": "price_range", "label": "What is your expected drink price range?", "placeholder": "e.g. RM 8 - RM 12"},
+                            {"id": "positioning", "label": "Are you positioning as budget, mid-range, or premium?", "placeholder": "e.g. Mid-range"},
+                            {"id": "cost_per_unit", "label": "What is your estimated cost per drink?", "placeholder": "e.g. RM 3.50"},
+                            {"id": "competitor_compare", "label": "What nearby competitor price are you comparing against?", "placeholder": "e.g. Starbucks (RM 16), Local Kiosk (RM 7)"}
+                        ]
 
-                        task_dict = {
-                            "case_id": case_id,
-                            "title": task["title"],
-                            "description": task["description"],
-                            "type": t_type,
-                            "status": "pending",
-                            "action_label": task["action_label"],
-                            "data": {"questions": t_questions},
-                            "source": "location_analysis",
-                            "location_analysis_id": doc_ref.id,
-                            "created_at": now,
-                            "updated_at": now,
-                        }
-                        case_ref.collection("tasks").document().set(task_dict)
-                        existing_normalized.add(norm_title)
+                    task_dict = {
+                        "case_id": case_id,
+                        "title": task["title"],
+                        "description": task["description"],
+                        "type": t_type,
+                        "status": "pending",
+                        "action_label": task["action_label"],
+                        "canonical_key": service.derive_canonical_key(task["title"]),
+                        "data": {"questions": t_questions},
+                        "source": "location_analysis",
+                        "location_analysis_id": doc_ref.id,
+                    }
+                    await service.upsert_task_by_canonical_key(db, case_id, task_dict)
                 
                 # 2. Update main case document with summary pointers
                 strong_threats_list = [
@@ -437,18 +440,19 @@ async def get_competitors(
                     if c["distance_meters"] < 500 and c["rating"] >= 4.2 and c["review_count"] >= 100
                 ]
 
-                resolved_name = result.get("resolved_location_name") or target_location
-                resolved_address = result.get("resolved_address") or ""
+                resolved_name = target_name or target_location
+                resolved_address = target_address or ""
+                resolved_google_maps_url = target_google_maps_url or f"https://www.google.com/maps/search/?api=1&query={target_lat},{target_lng}"
 
                 case_ref.update({
                     "target_location": resolved_name, # Update main location field
                     "latest_location_analysis_id": doc_ref.id,
                     "latest_resolved_location_name": resolved_name,
                     "latest_resolved_address": resolved_address,
-                    "latest_location_place_id": result.get("resolved_place_id"),
-                    "latest_location_lat": result.get("resolved_lat"),
-                    "latest_location_lng": result.get("resolved_lng"),
-                    "latest_location_google_maps_url": f"https://www.google.com/maps/search/?api=1&query={result.get('resolved_lat')},{result.get('resolved_lng')}&query_place_id={result.get('resolved_place_id')}" if result.get("resolved_place_id") else None,
+                    "latest_location_place_id": target_place_id,
+                    "latest_location_lat": target_lat,
+                    "latest_location_lng": target_lng,
+                    "latest_location_google_maps_url": resolved_google_maps_url,
                     "latest_market_risk_score": risk_score,
                     "latest_market_risk_level": risk_level,
                     "latest_market_risk_explanation": risk_explanation,
@@ -456,6 +460,16 @@ async def get_competitors(
                     "latest_competitor_count": len(competitors),
                     "latest_strong_competitor_count": len(strong_threats_list),
                     "latest_analysis_updated_at": now,
+                    "latestLocationAnalysisId": doc_ref.id,
+                    "latestResolvedLocationName": resolved_name,
+                    "latestResolvedAddress": resolved_address,
+                    "latestLocationLat": target_lat,
+                    "latestLocationLng": target_lng,
+                    "latestMarketRiskScore": risk_score,
+                    "latestMarketRiskLevel": risk_level,
+                    "latestMarketSummary": risk_explanation,
+                    "latestCompetitorCount": len(competitors),
+                    "latestStrongCompetitorCount": len(strong_threats_list),
                     "updated_at": now
                 })
 
@@ -466,9 +480,9 @@ async def get_competitors(
                     "structured_answer": {
                         "name": resolved_name,
                         "address": resolved_address,
-                        "lat": result.get("resolved_lat"),
-                        "lng": result.get("resolved_lng"),
-                        "place_id": result.get("resolved_place_id")
+                        "lat": target_lat,
+                        "lng": target_lng,
+                        "place_id": target_place_id
                     },
                     "question": "What is your target location?",
                     "status": "submitted",

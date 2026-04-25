@@ -22,6 +22,14 @@ CHECKLIST_FACTORS = [
     "neighborhood_safety_rating"
 ]
 
+# Required facts for verdict
+REQUIRED_FACTS = [
+    "confirmed_rent_myr",
+    "avg_ticket_size_myr",
+    "estimated_footfall_lunch",
+    "competitor_count"
+]
+
 def build_agent_prompt(case) -> str:
     missing = [f for f in CHECKLIST_FACTORS if f not in case.fact_sheet]
     
@@ -34,8 +42,27 @@ def build_agent_prompt(case) -> str:
     if loc_analysis:
         loc_details = f"\n- Resolved Location: {loc_analysis.get('resolved_name', '')} (Risk: {loc_analysis.get('risk_level', '')} {loc_analysis.get('risk_score', '')}/10)\n- Competitors: {loc_analysis.get('competitor_count', 0)} total, {loc_analysis.get('strong_competitor_count', 0)} strong threats"
         
-    roadmap = json.dumps(case.tasks, indent=2) if getattr(case, 'tasks', None) else "No tasks assigned"
-    inputs = json.dumps(case.case_inputs, indent=2) if getattr(case, 'case_inputs', None) else "No structured inputs yet"
+    # Use a custom encoder to handle Firestore datetime objects safely
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return super().default(obj)
+
+    roadmap = json.dumps(case.tasks, indent=2, cls=DateTimeEncoder) if getattr(case, 'tasks', None) else "No tasks assigned"
+    
+    # Clean case_inputs for the AI: remove internal timestamps to keep context window clean
+    clean_inputs = []
+    if getattr(case, 'case_inputs', None):
+        for inp in case.case_inputs:
+            clean_inputs.append({
+                "question": inp.get("question"),
+                "answer": inp.get("answer"),
+                "key": inp.get("key")
+            })
+    inputs = json.dumps(clean_inputs, indent=2) if clean_inputs else "No structured inputs yet"
+
+    pending_str = f"Awaiting answer for '{case.pending_input_key}' ({case.pending_input_question})" if getattr(case, 'pending_input_key', None) else "None"
 
     return f"""You are F&B Genie — an insightful, data-driven business advisor and investigator for Malaysian F&B MSMEs.
 You are professional, analytical, and work alongside the user to uncover the truth about their business idea.
@@ -48,6 +75,7 @@ CURRENT CASE:
 - Market Intelligence: {market_intel_str}{loc_details}
 - Current Roadmap: {roadmap}
 - Case Inputs: {inputs}
+- Pending Follow-up: {pending_str}
 
 KNOWN FACTS (do not fabricate anything not in this dict):
 {json.dumps(case.fact_sheet, indent=2)}
@@ -67,7 +95,7 @@ YOUR RULES:
 9. VERDICT THRESHOLD: You can issue a verdict once you have gathered sufficient context (at least 5 key items).
 10. STRICT JSON FORMATTING: You MUST output valid JSON matching exactly one of these types:
    - {{"type":"tool_call","tool":"...","args":{{...}}}}
-   - {{"type":"task_batch","chat_message":"...","tasks":[{{"title":"...","instruction":"...","ai_message":"...","follow_up_action":"...","evidence_type":"count|photo|rating|text|location|schedule|decision|questions","options":[{{"id":"...","title":"..."}}],"questions":[{{"id":"...","label":"..."}}],"event_title":"...","event_duration":"..."}}]}}
+   - {{"type":"task_batch","chat_message":"...","tasks":[{{"title":"...","canonical_key":"...","instruction":"...","ai_message":"...","follow_up_action":"...","evidence_type":"count|photo|rating|text|location|schedule|decision|questions","options":[{{"id":"...","title":"..."}}],"questions":[{{"id":"...","label":"..."}}],"event_title":"...","event_duration":"..."}}]}}
    - {{"type":"clarify","question":"...","options":[...]}}
    - {{"type":"verdict","decision":"GO|PIVOT|STOP","confidence":0.0-1.0,"summary":"...","pivot_suggestion":"..."}}
 11. Output JSON only. No preamble, no explanation outside the JSON.

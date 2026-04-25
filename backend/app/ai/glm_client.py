@@ -5,6 +5,8 @@
 import json
 import logging
 import asyncio
+import re
+from typing import Any, Literal, Optional, TYPE_CHECKING
  
 import httpx
  
@@ -16,17 +18,30 @@ logger = logging.getLogger(__name__)
  
 # ── Fallback output when AI auth fails in development ────────────────────────
  
-def _development_fallback_output() -> AgentOutput:
-    """Return a usable fallback when the AI key is unavailable in development."""
-    from app.ai.schemas import FieldTaskOutput
-    return FieldTaskOutput(
-        type="field_task",
-        title="Confirm the target location and rent",
-        instruction=(
-            "Provide the exact target area or address and the expected monthly rent. "
-            "These details are required before the business idea can be assessed."
-        ),
-        evidence_type="text",
+def _development_fallback_output(case: Optional["BusinessCase"] = None) -> AgentOutput:
+    """Return a context-aware fallback when the AI key is unavailable."""
+    from app.ai.schemas import TaskBatchOutput, TaskDef
+    
+    idea = case.idea if case else "your business"
+    location = case.location if case else "your target area"
+    
+    msg = (
+        f"I'm currently unable to reach my high-level reasoning service, but let's keep moving. "
+        f"To assess '{idea}' in {location}, I need a few more details."
+    )
+    
+    return TaskBatchOutput(
+        type="task_batch",
+        chat_message=msg,
+        tasks=[
+            TaskDef(
+                title="Confirm target area and rent",
+                instruction=f"Provide the exact street or neighborhood in {location} and the expected monthly rent.",
+                evidence_type="text",
+                ai_message="Detailed location and rent are critical for our first-pass feasibility check.",
+                follow_up_action="Analyze Audience"
+            )
+        ]
     )
  
  
@@ -36,7 +51,7 @@ def _get_glm_config() -> tuple[str, str, str, int]:
     """Read and validate GLM config from settings."""
     base_url   = settings.GLM_API_BASE_URL.strip().rstrip("/")
     api_key    = settings.GLM_API_KEY.strip()
-    model      = settings.GLM_MODEL_NAME.strip() or "ilmu-glm-5.1"
+    model      = settings.GLM_MODEL_NAME.strip() or "gemini-2.5-flash"
     max_tokens = settings.GLM_MAX_TOKENS
  
     missing = []
@@ -55,8 +70,11 @@ def _get_glm_config() -> tuple[str, str, str, int]:
 # ── Endpoint detection ────────────────────────────────────────────────────────
  
 def _is_google_gemini_endpoint(base_url: str) -> bool:
-    """Return True when the configured URL points to Google's Gemini API."""
-    return "generativelanguage.googleapis.com" in base_url.lower()
+    """Return True when the configured URL points to Google's Gemini NATIVE API."""
+    # If the URL explicitly includes /openai/, we treat it as an OpenAI-compatible endpoint
+    # to avoid double-appending or incorrect path transformations.
+    url_lower = base_url.lower()
+    return "generativelanguage.googleapis.com" in url_lower and "/openai" not in url_lower
  
  
 def _gemini_generate_content_url(base_url: str, model: str) -> str:
@@ -99,10 +117,69 @@ def _clean_json_content(content: str) -> str:
     """Strip markdown fences and whitespace from AI output."""
     content = content.strip()
     if content.startswith("```"):
-        content = content.split("```")[1]
-        if content.startswith("json"):
-            content = content[4:]
+        match = re.search(r"```(?:json)?\s*(.*?)```", content, flags=re.DOTALL | re.IGNORECASE)
+        if match:
+            content = match.group(1)
     return content.strip()
+
+
+def _extract_json_candidate(content: str) -> str | None:
+    """Find a structured JSON object/array embedded in useful prose."""
+    stripped = content.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        return stripped
+
+    object_match = re.search(r"\{.*\}", stripped, flags=re.DOTALL)
+    if object_match:
+        return object_match.group(0).strip()
+
+    array_match = re.search(r"\[.*\]", stripped, flags=re.DOTALL)
+    if array_match:
+        return array_match.group(0).strip()
+
+    return None
+
+
+def _normalize_agent_data(data: Any) -> dict:
+    """Accept small schema variants from Gemini/OpenAI-compatible responses."""
+    if isinstance(data, list):
+        data = data[0] if data else {}
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Unexpected AI response shape: {data}")
+
+    if "task_batch" in data and "tasks" not in data:
+        data["tasks"] = data.get("task_batch")
+    if "field_task" in data and isinstance(data.get("field_task"), dict):
+        data = {"type": "field_task", **data["field_task"]}
+    if "type" not in data:
+        if "tasks" in data:
+            data["type"] = "task_batch"
+        elif "content" in data or "message" in data or "text" in data:
+            data = {
+                "type": "text",
+                "content": data.get("content") or data.get("message") or data.get("text") or "",
+            }
+        else:
+            raise ValueError(f"Unexpected AI response shape: {data}")
+
+    if data["type"] == "task_batch":
+        data.setdefault("tasks", [])
+        normalized_tasks = []
+        for task in data.get("tasks") or []:
+            if isinstance(task, dict):
+                task.setdefault("instruction", task.get("description") or task.get("aiMessage") or task.get("title") or "Provide this information.")
+                task.setdefault("evidence_type", task.get("evidenceType") or "text")
+            normalized_tasks.append(task)
+        data["tasks"] = normalized_tasks
+        data["chat_message"] = data.get("chat_message") or data.get("chatMessage") or data.get("aiMessage") or data.get("message")
+    if data["type"] == "field_task":
+        data.setdefault("instruction", data.get("description") or data.get("title") or "Provide this information.")
+        data.setdefault("evidence_type", data.get("evidenceType") or "text")
+    if data["type"] == "text":
+        data["content"] = data.get("content") or data.get("message") or data.get("text") or ""
+
+    return data
  
  
 # ── Output type dispatcher ────────────────────────────────────────────────────
@@ -113,17 +190,12 @@ _TYPE_MAP = {
     "field_task": "FieldTaskOutput",   # ZAI single field task
     "clarify":    "ClarifyOutput",
     "verdict":    "VerdictOutput",
+    "text":       "TextOutput",
 }
  
 def _parse_agent_output(content: str) -> AgentOutput:
     """Parse cleaned JSON string into a typed AgentOutput."""
-    data = json.loads(content)
- 
-    if isinstance(data, list):
-        data = data[0]
- 
-    if not isinstance(data, dict) or "type" not in data:
-        raise ValueError(f"Unexpected AI response shape: {data}")
+    data = _normalize_agent_data(json.loads(content))
  
     from app.ai import schemas
     cls_name = _TYPE_MAP.get(data["type"])
@@ -131,6 +203,29 @@ def _parse_agent_output(content: str) -> AgentOutput:
         raise ValueError(f"Unknown output type: {data['type']!r}")
  
     return getattr(schemas, cls_name)(**data)
+
+
+def _content_to_agent_output(content: str) -> AgentOutput:
+    """Return structured output when possible, otherwise preserve useful text."""
+    from app.ai.schemas import TextOutput
+
+    cleaned = _clean_json_content(content)
+    if not cleaned:
+        raise ValueError("AI returned empty content after stripping markdown fences.")
+
+    json_candidate = _extract_json_candidate(cleaned)
+    if json_candidate:
+        try:
+            parsed = _parse_agent_output(json_candidate)
+            if parsed.type == "task_batch" and not getattr(parsed, "chat_message", None):
+                prose = cleaned.replace(json_candidate, "").strip()
+                if prose:
+                    parsed.chat_message = prose
+            return parsed
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            logger.info("AI structured parse failed, preserving useful text: %s", exc)
+
+    return TextOutput(type="text", content=cleaned)
  
  
 # ── Main entry point ──────────────────────────────────────────────────────────
@@ -138,6 +233,7 @@ def _parse_agent_output(content: str) -> AgentOutput:
 async def glm_call(
     messages: list[dict],
     system: str,
+    case: Optional["BusinessCase"] = None,
     _retry: int = 0,
     max_retries: int = 3,
 ) -> AgentOutput:
@@ -195,9 +291,9 @@ async def glm_call(
                     "Gemini API failed: status=%s body=%s",
                     exc.response.status_code, exc.response.text[:500],
                 )
-                if settings.APP_ENV == "development" and exc.response.status_code in {400, 401, 403}:
-                    logger.warning("Using development fallback — Gemini auth failed.")
-                    return _development_fallback_output()
+                if False:
+                    logger.warning(f"Using development fallback — Gemini API error {exc.response.status_code}")
+                    return _development_fallback_output(case)
                 raise
             except httpx.HTTPError:
                 logger.exception("Gemini request failed before receiving a response.")
@@ -231,9 +327,14 @@ async def glm_call(
  
         async with httpx.AsyncClient(timeout=90, http2=False) as client:
             try:
+                target_url = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
+                logger.info(f"AI Request: POST {target_url} (model={model})")
                 resp = await client.post(
-                    f"{base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    target_url,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
                     json=payload,
                 )
  
@@ -243,7 +344,7 @@ async def glm_call(
                         wait = (_retry + 1) * 5
                         logger.warning("GLM 504 timeout, retrying in %ss (%s/%s)", wait, _retry + 1, max_retries)
                         await asyncio.sleep(wait)
-                        return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
+                        return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
                     raise RuntimeError(f"GLM returned 504 after {max_retries} retries.")
  
                 resp.raise_for_status()
@@ -253,16 +354,16 @@ async def glm_call(
                     "GLM API failed: status=%s body=%s",
                     exc.response.status_code, exc.response.text[:500],
                 )
-                if settings.APP_ENV == "development" and exc.response.status_code == 401:
-                    logger.warning("Using development fallback — GLM auth failed.")
-                    return _development_fallback_output()
+                if False:
+                    logger.warning(f"Using development fallback — GLM auth failed: {exc.response.status_code}")
+                    return _development_fallback_output(case)
                 raise
             except httpx.TimeoutException:
                 if _retry < max_retries:
                     wait = (_retry + 1) * 5
                     logger.warning("GLM timeout, retrying in %ss (%s/%s)", wait, _retry + 1, max_retries)
                     await asyncio.sleep(wait)
-                    return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
+                    return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
                 raise
             except httpx.HTTPError:
                 logger.exception("GLM request failed before receiving a response.")
@@ -283,7 +384,7 @@ async def glm_call(
             if _retry < max_retries:
                 logger.warning("GLM response truncated (finish_reason=length), retrying (%s/%s)", _retry + 1, max_retries)
                 await asyncio.sleep(2)
-                return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
+                return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
             raise ValueError("GLM response truncated after max retries — increase max_tokens.")
  
         # GLM used native tool_calls instead of JSON content
@@ -316,15 +417,18 @@ async def glm_call(
                 "content": "[No output. Output your JSON decision now.]"
             })
             await asyncio.sleep(2)
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
+            return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
         raise ValueError(f"AI returned empty content after {max_retries} retries. Response: {raw}")
+
+    return _content_to_agent_output(content)
  
     content = _clean_json_content(content)
  
     if not content:
         raise ValueError("AI returned empty content after stripping markdown fences.")
  
-    # Content is prose instead of JSON — nudge and retry
+    # Content is prose instead of JSON — nudge and retry. 
+    # If it still fails after retries, return as TextOutput instead of raising error.
     if not content.startswith("{") and not content.startswith("["):
         if _retry < max_retries:
             logger.warning(
@@ -341,15 +445,21 @@ async def glm_call(
                 )
             })
             await asyncio.sleep(1)
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
-        raise ValueError(f"AI returned prose after {max_retries} retries: {content[:200]}")
+            return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
+        
+        logger.info("AI returned prose after max retries. Returning as TextOutput.")
+        from app.ai.schemas import TextOutput
+        return TextOutput(type="text", content=content)
  
     # Parse and return typed output
     try:
         return _parse_agent_output(content)
-    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         if _retry < max_retries:
             logger.warning("JSON parse failed (%s/%s): %s — %s", _retry + 1, max_retries, exc, content[:100])
             await asyncio.sleep(1)
-            return await glm_call(messages=messages, system=system, _retry=_retry + 1, max_retries=max_retries)
-        raise ValueError(f"JSON parse failed after {max_retries} retries: {exc} | content: {repr(content[:200])}")
+            return await glm_call(messages=messages, system=system, case=case, _retry=_retry + 1, max_retries=max_retries)
+        
+        logger.info("JSON parse failed after max retries. Returning as TextOutput.")
+        from app.ai.schemas import TextOutput
+        return TextOutput(type="text", content=content)

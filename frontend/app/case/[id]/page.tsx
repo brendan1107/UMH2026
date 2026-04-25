@@ -113,8 +113,32 @@ export default function CaseWorkspace() {
 
   const refreshTasks = useCallback(async () => {
     const tasksData = await tasksService.getTasks(id);
-    setTasks(toTaskListItems(tasksData));
-    return tasksData;
+    
+    // Deduplicate tasks by canonicalKey or normalized title
+    const dedupedTasks = tasksData.reduce((acc: InvestigationTask[], current) => {
+      const norm = (t: string) => t?.toLowerCase().replace(/[^a-z0-9]/g, '').trim() || '';
+      const xIndex = acc.findIndex(item => {
+        if (item.canonicalKey && current.canonicalKey) return item.canonicalKey === current.canonicalKey;
+        return norm(item.title) === norm(current.title);
+      });
+      if (xIndex === -1) return [...acc, current];
+      const existing = acc[xIndex];
+      // Priority: completed > latest updated
+      if (current.status === "completed" && existing.status !== "completed") {
+        const newAcc = [...acc]; newAcc[xIndex] = current; return newAcc;
+      }
+      if (current.status === existing.status) {
+        const currentUpdate = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+        const existingUpdate = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        if (currentUpdate > existingUpdate) {
+          const newAcc = [...acc]; newAcc[xIndex] = current; return newAcc;
+        }
+      }
+      return acc;
+    }, []);
+
+    setTasks(toTaskListItems(dedupedTasks));
+    return dedupedTasks;
   }, [id]);
 
   const refreshUploads = useCallback(async () => {
@@ -137,7 +161,31 @@ export default function CaseWorkspace() {
       setCaseDetails(caseData);
       setSessionStatus(toSessionStatus(caseData.status));
       setMessages(messagesData);
-      setTasks(toTaskListItems(tasksData));
+      
+      // Deduplicate tasks by canonicalKey or normalized title
+      const dedupedTasks = tasksData.reduce((acc: InvestigationTask[], current) => {
+        const norm = (t: string) => t?.toLowerCase().replace(/[^a-z0-9]/g, '').trim() || '';
+        const xIndex = acc.findIndex(item => {
+          if (item.canonicalKey && current.canonicalKey) return item.canonicalKey === current.canonicalKey;
+          return norm(item.title) === norm(current.title);
+        });
+        if (xIndex === -1) return [...acc, current];
+        const existing = acc[xIndex];
+        // Priority: completed > latest updated
+        if (current.status === "completed" && existing.status !== "completed") {
+          const newAcc = [...acc]; newAcc[xIndex] = current; return newAcc;
+        }
+        if (current.status === existing.status) {
+          const currentUpdate = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+          const existingUpdate = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+          if (currentUpdate > existingUpdate) {
+            const newAcc = [...acc]; newAcc[xIndex] = current; return newAcc;
+          }
+        }
+        return acc;
+      }, []);
+
+      setTasks(toTaskListItems(dedupedTasks));
       setFiles(toStoredUploadedFiles(uploadsData));
 
       try {
@@ -171,8 +219,8 @@ export default function CaseWorkspace() {
     setRecommendation((prev) => prev ? { ...prev, status: "gathering" } : prev);
 
     try {
-      const aiMessage = await chatService.sendMessage(id, "default_session", content);
-      setMessages((prev) => [...prev, aiMessage]);
+      await chatService.sendMessage(id, "default_session", content);
+      setMessages(await chatService.getMessages(id, "default_session"));
       await refreshTasks();
       
       const updatedRec = await reportsService.getLatestRecommendation(id);
@@ -191,8 +239,15 @@ export default function CaseWorkspace() {
     setIsTaskModalOpen(false);
     try {
       const updatedTask = await tasksService.updateTask(id, taskId, "completed", actionData);
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? ({ ...t, ...updatedTask } as Task) : t)));
       setStagedTaskActions((prev) => ({ ...prev, [taskId]: actionData }));
+      await refreshTasks();
+      setMessages(await chatService.getMessages(id, "default_session"));
+      
+      // Also refresh recommendation state as it might have changed
+      try {
+        const recData = await reportsService.getLatestRecommendation(id);
+        setRecommendation(recData as RecommendationData);
+      } catch (err) { /* ignore if not ready */ }
     } catch (error) {
       console.error("Failed to save task", error);
       alert("Failed to save task. Please try again.");
@@ -335,12 +390,21 @@ export default function CaseWorkspace() {
           </div>
         )}
         
-        <TaskList tasks={tasks.filter(t => t.status === "completed" && !stagedTaskActions[t.id])} title="Completed Tasks" disabled={true} onTaskUpdate={() => {}} />
+        <TaskList 
+          tasks={tasks.filter(t => t.status === "completed" && !stagedTaskActions[t.id])} 
+          title="Completed Tasks" 
+          disabled={sessionStatus === "archived"} 
+          onTaskAction={(t) => { setActiveTask(t); setIsTaskModalOpen(true); }}
+          onTaskUpdate={() => {}} 
+        />
         
         <div className="p-4 border-t border-slate-200">
           <LocationAnalysis caseId={id} onAnalysisComplete={async () => {
             await refreshTasks();
             setMessages(await chatService.getMessages(id, "default_session"));
+            try {
+              setRecommendation(await reportsService.getLatestRecommendation(id) as RecommendationData);
+            } catch {}
           }} />
         </div>
       </div>

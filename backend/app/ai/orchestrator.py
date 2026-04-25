@@ -27,6 +27,7 @@ async def run_agent_turn(
     output = await glm_call(
         messages=messages,
         system=system,
+        case=case,
     )
 
     case.messages.append({
