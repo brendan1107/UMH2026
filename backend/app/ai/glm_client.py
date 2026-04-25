@@ -3,7 +3,6 @@ import json
 import logging
 import asyncio
 import httpx
-
 from app.ai.schemas import AgentOutput
 from app.config import settings
 
@@ -12,7 +11,6 @@ logger = logging.getLogger(__name__)
 def _development_fallback_output() -> AgentOutput:
     """Return a usable task when the configured local AI key is unavailable."""
     from app.ai.schemas import FieldTaskOutput
-
     return FieldTaskOutput(
         type="field_task",
         title="Confirm the target location and rent",
@@ -24,154 +22,200 @@ def _development_fallback_output() -> AgentOutput:
     )
 
 def _get_glm_config() -> tuple[str, str, str]:
-    """Read config from settings, but force Gemini 2.5 Flash."""
-    base_url = settings.GLM_API_BASE_URL.strip().rstrip("/")
+    """
+    Read GLM config from settings.
+    Strips the /openai suffix so the native Gemini endpoint is used,
+    which supports Google Search grounding.
+    """
+    base_url = settings.GLM_API_BASE_URL.strip().rstrip("/").replace("/openai", "")
     api_key = settings.GLM_API_KEY.strip()
-    
-    # ── CHANGE THIS LINE TO 2.5 ──
-    model = "gemini-2.5-flash"
+    model = settings.GLM_MODEL_NAME.strip() or "gemini-2.5-flash"
 
-    missing = []
-    if not base_url:
-        missing.append("GLM_API_BASE_URL")
     if not api_key:
-        missing.append("GLM_API_KEY")
-
-    if missing:
-        raise RuntimeError(f"Missing GLM configuration: {', '.join(missing)}")
+        raise RuntimeError("Missing GLM configuration: GLM_API_KEY")
 
     return base_url, api_key, model
+
+
+def _extract_text_from_gemini(raw: dict) -> str:
+    """
+    Extract text content from native Gemini API response.
+    Gemini may return multiple parts — join them all.
+    """
+    try:
+        parts = raw["candidates"][0]["content"]["parts"]
+        return "".join(p.get("text", "") for p in parts if "text" in p)
+    except (KeyError, IndexError) as e:
+        raise ValueError(f"Unexpected Gemini response shape: {raw}") from e
+
+
+def _convert_messages_to_gemini(system: str, messages: list[dict]) -> tuple[str, list[dict]]:
+    """
+    Convert OpenAI-style messages (including Multimodal Data URIs) 
+    to Gemini native format.
+    """
+    contents = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        # Gemini uses 'model' instead of 'assistant'
+        gemini_role = "model" if role == "assistant" else "user"
+        
+        parts = []
+        if isinstance(content, str) and content.strip():
+            parts.append({"text": content})
+        elif isinstance(content, list):
+            for item in content:
+                if item.get("type") == "text":
+                    parts.append({"text": item["text"]})
+                elif item.get("type") == "image_url":
+                    # Convert Base64 Data URI to Native Gemini Inline Data
+                    url = item["image_url"]["url"]
+                    if url.startswith("data:"):
+                        mime_type = url.split(";")[0].replace("data:", "")
+                        b64_data = url.split(",")[1]
+                        parts.append({
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": b64_data
+                            }
+                        })
+        if parts:
+            contents.append({
+                "role": gemini_role,
+                "parts": parts
+            })
+            
+    return system, contents
+
 
 async def glm_call(
     messages: list[dict],
     system: str,
     max_retries: int = 3,
+    _retry: int = 0,
 ) -> AgentOutput:
+    
     base_url, api_key, model = _get_glm_config()
 
-    # ── THE MULTIMODAL FIX ── 
-    # Filter out empty messages safely (handling both string text AND image lists)
-    valid_messages = []
-    for m in messages:
-        content = m.get("content")
-        if isinstance(content, str) and content.strip():
-            valid_messages.append(m)
-        elif isinstance(content, list) and len(content) > 0:
-            valid_messages.append(m)
+    # Convert to Gemini native format and translate images
+    system_instruction, contents = _convert_messages_to_gemini(system, messages)
+
+    # If no contents, add a starter message
+    if not contents:
+        contents = [{
+            "role": "user",
+            "parts": [{"text": "Begin your investigation. What do you need to find out first?"}]
+        }]
 
     payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            *valid_messages,
+        "system_instruction": {
+            "parts": [{"text": system_instruction}]
+        },
+        "contents": contents,
+        "tools": [
+            # Google Search grounding
+            {"google_search": {}}
         ],
-        "temperature": 0.2,
-        "max_tokens": 2500, # Gives AI enough room to write verdicts
+        "generation_config": {
+            "temperature": 0.2,
+            "max_output_tokens": 2500,
+            "response_mime_type": "text/plain", 
+        },
     }
 
-    last_error = None
-
     async with httpx.AsyncClient(timeout=60, http2=False) as client:
-        for attempt in range(1, max_retries + 1):
-            try:
-                resp = await client.post(
-                    f"{base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    json=payload,
-                )
-                
-                if resp.status_code != 200:
-                    last_error = ValueError(f"API Error {resp.status_code}: {resp.text}")
-                    if resp.status_code in (429, 503, 504):
-                        wait = attempt * 5
-                        print(f"  [glm_call] HTTP {resp.status_code}, retrying in {wait}s")
-                        await asyncio.sleep(wait)
-                        continue
-                    raise last_error
-
-                raw = resp.json()
-                choice = raw["choices"][0]
-                message = choice.get("message", {})
-                content = message.get("content")
-                finish = choice.get("finish_reason", "")
-
-                # If truncated due to token limit
-                if finish == "length":
-                    print(f"  [glm_call] WARNING: response truncated. Retrying {attempt}/{max_retries}")
-                    await asyncio.sleep(2)
-                    last_error = ValueError("GLM response truncated")
-                    continue
-
-                # Handle native tool_calls instead of JSON content
-                if content is None:
-                    tool_calls = message.get("tool_calls")
-                    if tool_calls:
-                        tc = tool_calls[0]
-                        fn_name = tc.get("function", {}).get("name", "fetch_competitors")
-                        args_raw = tc.get("function", {}).get("arguments", "{}")
-                        try:
-                            args_dict = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
-                        except Exception:
-                            args_dict = {}
-                        content = json.dumps({
-                            "type": "tool_call",
-                            "tool": fn_name,
-                            "args": args_dict,
-                        })
-                    else:
-                        print(f"  [glm_call] content is None, no tool_calls. Message: {message}")
-                        last_error = ValueError(f"GLM returned null content.")
-                        await asyncio.sleep(2)
-                        continue
-
-                # Clean markdown fences
-                content = content.strip()
-                if content.startswith("```"):
-                    content = content.split("```")[1]
-                    if content.startswith("json"):
-                        content = content[4:]
-                content = content.strip()
-
-                # Parse JSON
-                try:
-                    data = json.loads(content)
-                except json.JSONDecodeError as e:
-                    print(f"  [glm_call] JSON parse error: {e} | content: {repr(content[:100])}")
-                    last_error = ValueError(f"Invalid JSON from GLM: {e}")
-                    await asyncio.sleep(2)
-                    continue
-
-                if isinstance(data, list):
-                    data = data[0]
-
-                if not isinstance(data, dict) or "type" not in data:
-                    last_error = ValueError(f"Unexpected shape: {data}")
-                    await asyncio.sleep(2)
-                    continue
-
-                type_map = {
-                    "tool_call":  "ToolCallOutput",
-                    "field_task": "FieldTaskOutput",
-                    "clarify":    "ClarifyOutput",
-                    "verdict":    "VerdictOutput",
-                }
-                
-                from app.ai import schemas
-                cls_name = type_map.get(data["type"])
-                if not cls_name:
-                    last_error = ValueError(f"Unknown type: {data['type']}")
-                    await asyncio.sleep(2)
-                    continue
-
-                return getattr(schemas, cls_name)(**data)
-
-            except httpx.TimeoutException:
-                wait = attempt * 5
-                print(f"  [glm_call] Timeout on attempt {attempt}/{max_retries}, retrying in {wait}s")
+        try:
+            resp = await client.post(
+                f"{base_url}/models/{model}:generateContent",
+                headers={"x-goog-api-key": api_key},
+                json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # Handle rate limits and server errors with recursion
+            if exc.response.status_code in (429, 503, 504) and _retry < max_retries:
+                wait = (_retry + 1) * 5
+                logger.warning(f"HTTP {exc.response.status_code}, retrying in {wait}s...")
                 await asyncio.sleep(wait)
-                last_error = Exception("GLM timeout after 60s")
-                continue
+                return await glm_call(messages, system, max_retries, _retry + 1)
+                
+            if settings.APP_ENV == "development" and exc.response.status_code == 401:
+                return _development_fallback_output()
+            raise
+        except httpx.TimeoutException:
+            if _retry < max_retries:
+                wait = (_retry + 1) * 5
+                logger.warning(f"Timeout, retrying in {wait}s...")
+                await asyncio.sleep(wait)
+                return await glm_call(messages, system, max_retries, _retry + 1)
+            raise RuntimeError("Gemini timeout after 60s")
 
-    raise RuntimeError(
-        f"GLM failed after {max_retries} attempts. Last error: {last_error}"
-    )
+        raw = resp.json()
+
+    # Check if Gemini used search grounding
+    candidates = raw.get("candidates", [])
+    if candidates:
+        grounding = candidates[0].get("groundingMetadata", {})
+        search_queries = grounding.get("webSearchQueries", [])
+        if search_queries:
+            print(f"🔍 Gemini searched Google for: {search_queries}")
+        else:
+            print("ℹ️  Gemini did not use Google Search this turn")
+
+    # Extract text from Gemini native response format
+    content = _extract_text_from_gemini(raw)
+
+    # ── LOGICAL RETRIES (Empty content or Prose) ──
+    if not content or not content.strip():
+        if _retry < max_retries:
+            logger.warning("Gemini returned empty content — retrying")
+            messages.append({"role": "assistant", "content": "[Search completed. Now output JSON decision.]"})
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Gemini returned empty content. Full response: {raw}")
+
+    content = content.strip()
+
+    # Strip markdown fences
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    content = content.strip()
+
+    if not content.startswith("{") and not content.startswith("["):
+        if _retry < max_retries:
+            logger.warning("Gemini returned prose instead of JSON — retrying")
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": "You MUST output only a valid JSON object starting with {."})
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Gemini returned prose: {content[:200]}")
+
+    # ── JSON PARSING ──
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as e:
+        if _retry < max_retries:
+            logger.warning("JSON parse error — retrying")
+            return await glm_call(messages, system, max_retries, _retry + 1)
+        raise ValueError(f"Invalid JSON: {e}")
+
+    if isinstance(data, list):
+        data = data[0]
+
+    if not isinstance(data, dict) or "type" not in data:
+        raise ValueError(f"Unexpected shape: {data}")
+
+    type_map = {
+        "tool_call":  "ToolCallOutput",
+        "field_task": "FieldTaskOutput",
+        "clarify":    "ClarifyOutput",
+        "verdict":    "VerdictOutput",
+    }
+    
+    from app.ai import schemas
+    cls_name = type_map.get(data["type"])
+    if not cls_name:
+        raise ValueError(f"Unknown type: {data['type']}")
+
+    return getattr(schemas, cls_name)(**data)

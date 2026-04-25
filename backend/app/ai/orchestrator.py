@@ -48,11 +48,15 @@ async def run_agent_turn(
             })
             return await run_agent_turn(case, _depth=_depth + 1)
 
-    # Advance phase — if agent issued verdict, force phase to VERDICT
-    # regardless of whether all required facts are in fact_sheet
+    # If verdict, mark phase but don't lock —
+    # user can add more info and get a revised verdict
     if output.type == "verdict":
         case.phase = "VERDICT"
     else:
-        case.phase = next_phase(case, output)
+        # If case was in VERDICT but user added new info, reopen to EVIDENCE
+        if case.phase == "VERDICT":
+            case.phase = "EVIDENCE"
+        else:
+            case.phase = next_phase(case, output)
 
     return case, output
