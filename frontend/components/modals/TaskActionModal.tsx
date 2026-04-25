@@ -47,13 +47,56 @@ type TaskData = {
   eventTitle?: string;
   eventDuration?: string;
 };
+type UploadedTaskFile = {
+  uploadId: string;
+  fileName: string;
+  fileType?: string;
+  fileSize?: number;
+  storagePath?: string;
+  storageMode?: string;
+  url?: string;
+};
 type TaskActionData =
   | { text: string }
   | { answers: Record<string, string> }
   | { selectedOption: string | null }
   | { location: SelectedLocation | null }
   | { eventDate: string }
+  | UploadedTaskFile
   | Record<string, never>;
+
+const BLOCKED_PATTERNS = [
+  "firebase-service-account",
+  "service-account",
+  ".env",
+  "env.backend",
+  "credentials.json",
+];
+
+const BLOCKED_EXTENSIONS = [".pem", ".key", ".p12", ".pfx"];
+
+const ALLOWED_EXTENSIONS = [
+  ".png", ".jpg", ".jpeg", ".webp",
+  ".pdf", ".doc", ".docx", ".ppt", ".pptx",
+  ".csv", ".xls", ".xlsx",
+];
+
+function validateEvidenceFile(file: File): string | null {
+  const filename = file.name.toLowerCase();
+
+  if (
+    BLOCKED_PATTERNS.some((pattern) => filename.includes(pattern)) ||
+    BLOCKED_EXTENSIONS.some((ext) => filename.endsWith(ext))
+  ) {
+    return "Sensitive configuration or credential files cannot be uploaded as evidence.";
+  }
+
+  if (!ALLOWED_EXTENSIONS.some((ext) => filename.endsWith(ext))) {
+    return `Unsupported file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}`;
+  }
+
+  return null;
+}
 
 function getGoogleMapsWindow() {
   return window as GoogleMapsWindow;
@@ -225,25 +268,73 @@ interface TaskActionModalProps {
   onClose: () => void;
   task: Task | null;
   onSubmit: (taskId: string, actionData: TaskActionData) => void;
+  onFileUpload?: (taskId: string, file: File) => Promise<UploadedTaskFile>;
 }
 
-export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: TaskActionModalProps) {
+export default function TaskActionModal({ isOpen, onClose, task, onSubmit, onFileUpload }: TaskActionModalProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [textInput, setTextInput] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [location, setLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
   const [eventDate, setEventDate] = useState<string>("");
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   if (!task) return null;
   const taskData = getTaskData(task);
 
-  const submitAction = () => {
+  const closeModal = () => {
+    setSelectedUploadFile(null);
+    setUploadError(null);
+    setIsDraggingFile(false);
+    onClose();
+  };
+
+  const handleSelectUploadFile = (file: File | undefined) => {
+    if (!file) return;
+
+    const validationError = validateEvidenceFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
+    setUploadError(null);
+    setSelectedUploadFile(file);
+    setIsDraggingFile(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const submitAction = async () => {
     let submitData: TaskActionData = {};
     if (task.type === "provide_text_input") submitData = { text: textInput };
     if (task.type === "answer_questions") submitData = { answers };
     if (task.type === "choose_option") submitData = { selectedOption };
     if (task.type === "select_location") submitData = { location };
     if (task.type === "schedule_event") submitData = { eventDate };
+    if (task.type === "upload_file" || task.type === "upload_image") {
+      if (!selectedUploadFile) return;
+      if (!onFileUpload) {
+        setUploadError("File upload is not available for this task.");
+        return;
+      }
+
+      setIsUploadingFile(true);
+      setUploadError(null);
+      try {
+        submitData = await onFileUpload(task.id, selectedUploadFile);
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "Failed to upload file.");
+        setIsUploadingFile(false);
+        return;
+      }
+      setIsUploadingFile(false);
+    }
     
     onSubmit(task.id, submitData);
     
@@ -253,11 +344,13 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
     setSelectedOption(null);
     setLocation(null);
     setEventDate("");
+    setSelectedUploadFile(null);
+    setUploadError(null);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    submitAction();
+    void submitAction();
   };
 
   const renderContent = () => {
@@ -335,12 +428,61 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
       case "upload_file":
       case "upload_image":
         return (
-          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50">
-             <svg className="w-10 h-10 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-             </svg>
-             <p className="text-sm font-medium text-slate-700">Click or drag files here</p>
-             <p className="text-xs text-slate-500 mt-1">Please use the workspace upload panel for now.</p>
+          <div className="space-y-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ALLOWED_EXTENSIONS.join(",")}
+              className="hidden"
+              onChange={(event) => handleSelectUploadFile(event.target.files?.[0])}
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setIsDraggingFile(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDraggingFile(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setIsDraggingFile(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleSelectUploadFile(event.dataTransfer.files?.[0]);
+              }}
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 ${
+                isDraggingFile
+                  ? "border-slate-500 bg-slate-100"
+                  : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-white"
+              }`}
+            >
+              <svg className="w-10 h-10 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-sm font-medium text-slate-700">
+                {isUploadingFile ? "Uploading..." : selectedUploadFile ? selectedUploadFile.name : "Click or drag files here"}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {selectedUploadFile ? "Ready to upload on Save Action." : "PDF, images, documents, spreadsheets, or slides."}
+              </p>
+            </div>
+            {uploadError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {uploadError}
+              </p>
+            )}
           </div>
         );
 
@@ -434,6 +576,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
     if (task.type === "provide_text_input") return !textInput.trim();
     if (task.type === "select_location") return !location;
     if (task.type === "schedule_event") return !eventDate;
+    if (task.type === "upload_file" || task.type === "upload_image") return !selectedUploadFile || isUploadingFile;
     return false;
   };
 
@@ -445,7 +588,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={closeModal}
             className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
           />
           <div className="fixed inset-y-0 right-0 z-50 flex items-center justify-end pointer-events-none sm:pr-4 py-4 w-full sm:w-[450px]">
@@ -461,7 +604,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
                   {task.title}
                 </h2>
                 <button
-                  onClick={onClose}
+                  type="button"
+                  onClick={closeModal}
                   className="text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -477,13 +621,14 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
               <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={closeModal}
                   className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={submitAction}
+                  type="button"
+                  onClick={() => void submitAction()}
                   disabled={isSubmitDisabled()}
                   className="px-6 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >

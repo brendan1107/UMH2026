@@ -35,7 +35,7 @@ export default function NewSessionModal({ isOpen, onClose }: NewSessionModalProp
       const newCase = await casesService.createCase({
         title: "New Investigation", // You could derive this or let them name it later
         description: description,
-        mode: sessionType,
+        stage: sessionType,
       });
 
       setIsSubmitting(false);

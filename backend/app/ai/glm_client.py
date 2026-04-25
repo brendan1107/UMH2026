@@ -1,20 +1,55 @@
 # ZAI API wrapper
 # app/ai/glm_client.py
-import os, json
-import httpx
-from dotenv import load_dotenv
-load_dotenv()
-from app.ai.schemas import AgentOutput
+import json
+import logging
 
-ZAI_BASE = os.getenv("GLM_API_BASE_URL")
-ZAI_KEY  = os.getenv("GLM_API_KEY")
+import httpx
+
+from app.ai.schemas import AgentOutput
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _development_fallback_output() -> AgentOutput:
+    """Return a usable task when the configured local AI key is unavailable."""
+    from app.ai.schemas import FieldTaskOutput
+
+    return FieldTaskOutput(
+        type="field_task",
+        title="Confirm the target location and rent",
+        instruction=(
+            "Provide the exact target area or address and the expected monthly rent. "
+            "These details are required before the business idea can be assessed."
+        ),
+        evidence_type="text",
+    )
+
+
+def _get_glm_config() -> tuple[str, str, str]:
+    """Read GLM config from the backend settings loader, including .env.backend."""
+    base_url = settings.GLM_API_BASE_URL.strip().rstrip("/")
+    api_key = settings.GLM_API_KEY.strip()
+    model = settings.GLM_MODEL_NAME.strip() or "ilmu-glm-5.1"
+
+    missing = []
+    if not base_url:
+        missing.append("GLM_API_BASE_URL")
+    if not api_key:
+        missing.append("GLM_API_KEY")
+
+    if missing:
+        raise RuntimeError(f"Missing GLM configuration: {', '.join(missing)}")
+
+    return base_url, api_key, model
 
 async def glm_call(
     messages: list[dict],
     system: str,
 ) -> AgentOutput:
+    base_url, api_key, model = _get_glm_config()
     payload = {
-        "model": os.getenv("GLM_MODEL_NAME", "ilmu-glm-5.1"),
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             *messages,
@@ -24,12 +59,29 @@ async def glm_call(
     }
 
     async with httpx.AsyncClient(timeout=60, http2=False) as client:
-        resp = await client.post(
-            f"{ZAI_BASE}/chat/completions",
-            headers={"Authorization": f"Bearer {ZAI_KEY}"},
-            json=payload,
-        )
-        resp.raise_for_status()
+        try:
+            resp = await client.post(
+                f"{base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "GLM API request failed: status=%s body=%s",
+                exc.response.status_code,
+                exc.response.text[:500],
+            )
+            if settings.APP_ENV == "development" and exc.response.status_code == 401:
+                logger.warning(
+                    "Using development fallback AI output because GLM authentication failed."
+                )
+                return _development_fallback_output()
+            raise
+        except httpx.HTTPError:
+            logger.exception("GLM API request failed before receiving a response.")
+            raise
+
         raw = resp.json()
 
     content = raw["choices"][0]["message"]["content"]

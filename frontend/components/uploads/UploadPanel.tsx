@@ -91,6 +91,7 @@ export default function UploadPanel({ files, onFileUpload, onFileDelete }: Uploa
               </div>
             </div>
             <button 
+              type="button"
               onClick={() => onFileDelete(file.id)}
               className="text-slate-400  hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
               title="Delete file"
@@ -113,6 +114,7 @@ export default function UploadPanel({ files, onFileUpload, onFileDelete }: Uploa
         className="hidden" 
       />
       <button 
+        type="button"
         onClick={() => fileInputRef.current?.click()}
         className="w-full py-2 border border-dashed border-slate-300  rounded-lg text-sm text-slate-600  hover:bg-slate-50  hover:text-slate-900  transition-colors flex items-center justify-center gap-2"
       >

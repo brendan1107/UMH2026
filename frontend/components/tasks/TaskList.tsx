@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 export type TaskType = 
   | "answer_questions" 
   | "choose_option" 
@@ -18,17 +16,18 @@ export interface Task {
   status: "pending" | "scheduled" | "skipped" | "completed";
   type?: TaskType;
   actionLabel?: string;
-  data?: any; // For options, questions, etc.
+  data?: Record<string, unknown>; // For options, questions, etc.
 }
 
 interface TaskListProps {
   tasks: Task[];
   disabled?: boolean;
   onTaskUpdate: (taskId: string, newStatus: Task["status"]) => void;
+  onTaskDelete?: (taskId: string) => void;
   onTaskAction?: (task: Task) => void;
 }
 
-export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskAction }: TaskListProps) {
+export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskDelete, onTaskAction }: TaskListProps) {
   return (
     <div className="p-4">
       <h3 className="text-xs font-semibold text-slate-500  uppercase tracking-wider mb-3">
@@ -44,7 +43,7 @@ export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskAction }
           return (
             <div 
               key={task.id} 
-              className={`group relative overflow-hidden p-3.5 rounded-xl border transition-all duration-300 ease-in-out ${
+              className={`group relative overflow-hidden p-3.5 pr-10 rounded-xl border transition-all duration-300 ease-in-out ${
                 isCompleted 
                   ? "bg-green-50/50  border-green-200 " 
                   : isSkipped
@@ -54,6 +53,19 @@ export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskAction }
                   : "bg-white  border-slate-200  hover:border-slate-300  hover:shadow-sm"
               }`}
             >
+              {onTaskDelete && !disabled && (
+                <button
+                  type="button"
+                  onClick={() => onTaskDelete(task.id)}
+                  title="Remove task"
+                  aria-label={`Remove ${task.title}`}
+                  className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 opacity-100 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 12h12" />
+                  </svg>
+                </button>
+              )}
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex-shrink-0">
                   {isCompleted ? (

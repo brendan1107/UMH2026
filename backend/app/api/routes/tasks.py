@@ -77,7 +77,9 @@ async def create_task(
         "description": data.description,
         "type": data.type,
         "status": data.status,
-        "action_label": data.actionLabel,
+        "action_label": data.action_label,
+        "data": data.data,
+        "source": data.source,
         "created_at": now,
         "updated_at": now,
     }
@@ -105,6 +107,8 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     update_fields = {"status": data.status, "updated_at": datetime.utcnow()}
+    if data.submitted_value is not None:
+        update_fields["submitted_value"] = data.submitted_value
     if data.status == "completed":
         update_fields["completed_at"] = datetime.utcnow()
 
@@ -154,9 +158,11 @@ async def complete_task(
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    tasks_query = db.collection_group(
-        InvestigationTask.SUBCOLLECTION
-    ).where(firestore.FieldPath.document_id(), "==", task_id).stream()
+    tasks_query = (
+        db.collection_group(TASKS_SUBCOLLECTION)
+        .where(firestore.FieldPath.document_id(), "==", task_id)
+        .stream()
+    )
 
     task_doc = None
     for doc in tasks_query:
@@ -167,30 +173,40 @@ async def complete_task(
     if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    submitted_value = data.get("submitted_value")
+    case_id = data.get("case_id")
+    parent_case_ref = task_doc.reference.parent.parent
+    if parent_case_ref is not None:
+        case_id = parent_case_ref.id
+
+    if not case_id:
+        raise HTTPException(status_code=422, detail="case_id is required")
+
+    _get_case_ref(db, case_id, user["uid"])
+
+    submitted_value = data.get("submitted_value", data.get("submittedValue"))
     task_doc.reference.update({
         "status": "completed",
         "submitted_value": submitted_value,
+        "completed_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
     })
 
     # ── Re-trigger agent now that user submitted evidence ──
-    case_id = data.get("case_id")
     if case_id:
         from app.ai.orchestrator import run_agent_turn
         from app.ai.schemas import BusinessCase as AICase
-        from datetime import datetime
 
         case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
         case_data = case_ref.get().to_dict()
 
         ai_case = AICase(
             id=case_id,
-            idea=case_data.get("description", case_data.get("title", "")),
-            location=case_data.get("target_location", ""),
-            budget_myr=float(case_data.get("budget_myr", 30000)),
-            phase=case_data.get("ai_phase", "EVIDENCE"),
-            fact_sheet=case_data.get("fact_sheet", {}),
-            messages=case_data.get("ai_messages", []),
+            idea=case_data.get("description") or case_data.get("title") or "",
+            location=case_data.get("target_location") or "",
+            budget_myr=float(case_data.get("budget_myr") or 30000),
+            phase=case_data.get("ai_phase") or "EVIDENCE",
+            fact_sheet=case_data.get("fact_sheet") or {},
+            messages=case_data.get("ai_messages") or [],
         )
 
         # Tell the agent what the user submitted
@@ -235,6 +251,12 @@ async def skip_task(
 
     if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    parent_case_ref = task_doc.reference.parent.parent
+    if parent_case_ref is None:
+        raise HTTPException(status_code=422, detail="Task has no parent case")
+
+    _get_case_ref(db, parent_case_ref.id, user["uid"])
 
     task_doc.reference.update({
         "status": "skipped",

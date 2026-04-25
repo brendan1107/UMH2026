@@ -23,26 +23,70 @@ import {
   verdictService,
   ChatMessage,
   BusinessCase,
-  EvidenceUpload
+  EvidenceUpload,
+  InvestigationTask,
+  TaskActionData
 } from "../../../lib/api";
 
 const toStoredUploadedFiles = (uploads: EvidenceUpload[]): UploadedFile[] =>
-  uploads
-    .filter((upload) => Boolean(upload.storagePath))
-    .map((upload) => ({
-      id: upload.id,
-      name: upload.name || upload.fileName || "Uploaded file",
-      size: upload.size,
-      type: upload.type
-    }));
+  uploads.map((upload) => ({
+    id: upload.id,
+    name: upload.name || upload.fileName || "Uploaded file",
+    size: upload.size,
+    type: upload.type
+  }));
+
+const toTaskListItems = (apiTasks: InvestigationTask[]): Task[] =>
+  apiTasks.map((task) => ({ ...task }));
+
+type UploadedTaskAction = {
+  uploadId: string;
+  fileName: string;
+  fileType?: string;
+  fileSize?: number;
+  storagePath?: string;
+  storageMode?: string;
+  url?: string;
+};
+type SubmittedTaskAction = {
+  selectedOption?: string | null;
+  answers?: Record<string, string>;
+  text?: string;
+  location?: { lat: number; lng: number; address: string } | null;
+  eventDate?: string;
+  uploadId?: string;
+  fileName?: string;
+};
+type SessionStatus = "active" | "insight_generated" | "archived";
+type TaskOption = { id: string; title?: string };
+type TaskQuestion = { id: string; label?: string };
+type TaskModalData = {
+  options?: TaskOption[];
+  questions?: TaskQuestion[];
+};
+
+const toSessionStatus = (status: BusinessCase["status"]): SessionStatus =>
+  status === "archived" || status === "insight_generated" ? status : "active";
+
+const toTaskUploadAction = (upload: EvidenceUpload): UploadedTaskAction => ({
+  uploadId: upload.id,
+  fileName: upload.name || upload.fileName || "Uploaded file",
+  fileType: upload.fileType,
+  fileSize: upload.fileSize,
+  storagePath: upload.storagePath,
+  storageMode: upload.storageMode,
+  url: upload.url,
+});
+
+const isUploadNotFoundError = (error: unknown) =>
+  error instanceof Error && error.message.toLowerCase().includes("upload not found");
 
 export default function CaseWorkspace() {
   const params = useParams();
   const id = params.id as string;
   const searchParams = useSearchParams();
   const typeParam = searchParams.get("type");
-  
-  const [sessionType, setSessionType] = useState<"new" | "existing">("new");
+  const sessionType: "new" | "existing" = typeParam === "existing" ? "existing" : "new";
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -52,7 +96,7 @@ export default function CaseWorkspace() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Session Status State
-  const [sessionStatus, setSessionStatus] = useState<"active" | "insight_generated" | "archived">("active");
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>("active");
   const [finalInsight, setFinalInsight] = useState<FinalInsight | null>(null);
 
   // Modal state
@@ -62,17 +106,21 @@ export default function CaseWorkspace() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // Staged tasks state
-  const [stagedTaskActions, setStagedTaskActions] = useState<Record<string, any>>({});
+  const [stagedTaskActions, setStagedTaskActions] = useState<Record<string, TaskActionData>>({});
 
   const currentUser = auth.currentUser;
 
-  useEffect(() => {
-    if (typeParam === "existing") {
-      setSessionType("existing");
-    } else {
-      setSessionType("new");
-    }
-  }, [typeParam]);
+  const refreshTasks = async () => {
+    const tasksData = await tasksService.getTasks(id);
+    setTasks(toTaskListItems(tasksData));
+    return tasksData;
+  };
+
+  const refreshUploads = async () => {
+    const uploadsData = await uploadsService.listUploads(id);
+    setFiles(toStoredUploadedFiles(uploadsData));
+    return uploadsData;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -86,15 +134,15 @@ export default function CaseWorkspace() {
         ]);
 
         setCaseDetails(caseData);
-        setSessionStatus(caseData.status as any);
+        setSessionStatus(toSessionStatus(caseData.status));
         setMessages(messagesData);
-        setTasks(tasksData as any);
+        setTasks(toTaskListItems(tasksData));
         setFiles(toStoredUploadedFiles(uploadsData));
 
         try {
           const recData = await reportsService.getLatestRecommendation(id);
           setRecommendation(recData as RecommendationData);
-        } catch (e) {
+        } catch {
           // No recommendation yet
           setRecommendation({
             status: "gathering",
@@ -124,16 +172,27 @@ export default function CaseWorkspace() {
     try {
       const aiMessage = await chatService.sendMessage(id, "default_session", content);
       setMessages((prev) => [...prev, aiMessage]);
+      await refreshTasks();
 
       try {
         const updatedRec = await reportsService.getLatestRecommendation(id);
         setRecommendation(updatedRec as RecommendationData);
-      } catch (e) {
-        console.error("Failed to get updated recommendation", e);
+      } catch (error) {
+        console.error("Failed to get updated recommendation", error);
       }
     } catch (error) {
       console.error("Failed to send message", error);
-      // Optional: remove optimistic message on failure or show error state
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const assistantErrorMessage: ChatMessage = {
+        id: `${Date.now()}-send-error`,
+        role: "assistant",
+        content: `I could not reach the backend AI service, so no investigation task was created. ${errorMessage}`,
+        createdAt: new Date().toISOString()
+      };
+      setMessages((prev) => [...prev, assistantErrorMessage]);
+      setRecommendation((prev) =>
+        prev ? { ...prev, status: "gathering" } : prev
+      );
     }
   };
 
@@ -142,15 +201,21 @@ export default function CaseWorkspace() {
     setIsTaskModalOpen(true);
   };
 
-  const handleTaskActionSubmit = async (taskId: string, actionData: any) => {
+  const handleTaskActionSubmit = async (taskId: string, actionData: TaskActionData) => {
     setIsTaskModalOpen(false);
-    
-    // Save the action locally
-    setStagedTaskActions(prev => ({ ...prev, [taskId]: actionData }));
-    
-    // Optimistically mark as completed in UI
-    handleTaskUpdate(taskId, "completed");
-    setActiveTask(null);
+
+    try {
+      const updatedTask = await tasksService.updateTask(id, taskId, "completed", actionData);
+      setTasks((prev) =>
+        prev.map((task) => (task.id === taskId ? ({ ...task, ...updatedTask } as Task) : task))
+      );
+      setStagedTaskActions(prev => ({ ...prev, [taskId]: actionData }));
+    } catch (error) {
+      console.error("Failed to save task action", error);
+      alert("Failed to save task action. Please try again.");
+    } finally {
+      setActiveTask(null);
+    }
   };
 
   const handleSubmitAllTasks = async () => {
@@ -158,29 +223,30 @@ export default function CaseWorkspace() {
     if (tasksToSubmit.length === 0) return;
 
     try {
-      let contents = [];
+      const contents = [];
       for (const [taskId, actionData] of tasksToSubmit) {
-        // Mark task as completed on backend
-        await tasksService.updateTask(taskId, "completed");
-        
         const task = tasks.find(t => t.id === taskId);
+        const taskData = task?.data as TaskModalData | undefined;
+        const submitted = actionData as SubmittedTaskAction;
         let content = `I've completed the task: ${task?.title || taskId}.`;
         
         if (task?.type === "choose_option") {
-          const option = task.data?.options?.find((o: any) => o.id === actionData.selectedOption);
-          content += `\nSelected option: ${option?.title || actionData.selectedOption}.`;
+          const option = taskData?.options?.find((option) => option.id === submitted.selectedOption);
+          content += `\nSelected option: ${option?.title || submitted.selectedOption}.`;
         } else if (task?.type === "answer_questions") {
           content += "\nProvided details:\n";
-          for (const [qId, ans] of Object.entries(actionData.answers || {})) {
-            const q = task.data?.questions?.find((q: any) => q.id === qId);
+          for (const [qId, ans] of Object.entries(submitted.answers || {})) {
+            const q = taskData?.questions?.find((question) => question.id === qId);
             content += `- ${q?.label || qId}: ${ans}\n`;
           }
         } else if (task?.type === "provide_text_input") {
-          content += `\nInput: ${actionData.text}`;
+          content += `\nInput: ${submitted.text}`;
         } else if (task?.type === "select_location") {
-          content += `\nSelected location: ${actionData.location?.address} (${actionData.location?.lat}, ${actionData.location?.lng})`;
+          content += `\nSelected location: ${submitted.location?.address} (${submitted.location?.lat}, ${submitted.location?.lng})`;
         } else if (task?.type === "schedule_event") {
-          content += `\nScheduled event for: ${actionData.eventDate}`;
+          content += `\nScheduled event for: ${submitted.eventDate}`;
+        } else if (task?.type === "upload_file" || task?.type === "upload_image") {
+          content += `\nUploaded file: ${submitted.fileName || submitted.uploadId || "uploaded evidence"}.`;
         }
         contents.push(content);
       }
@@ -201,7 +267,7 @@ export default function CaseWorkspace() {
       setRecommendation(prev => prev ? {
         ...prev,
         status: "ready",
-        verdict: verdict.verdict as any,
+        verdict: verdict.verdict,
         verdictReasoning: verdict.reasoning,
         nextSteps: verdict.nextSteps
       } : prev);
@@ -238,44 +304,79 @@ export default function CaseWorkspace() {
     }
   };
 
-  const handleTaskUpdate = (taskId: string, newStatus: Task["status"]) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId ? { ...task, status: newStatus } : task
-      )
-    );
+  const uploadEvidenceFile = async (file: File): Promise<EvidenceUpload> => {
+    const uploaded = await uploadsService.uploadFile(id, file);
+    await refreshUploads();
+    return uploaded;
   };
 
   const handleFileUpload = async (file: File) => {
     try {
-      const uploaded = await uploadsService.uploadFile(id, file);
-      if (uploaded.storageMode !== "firebase_storage" || !uploaded.storagePath) {
-        throw new Error("Upload did not complete in Firebase Storage.");
-      }
-
-      const uploadsData = await uploadsService.listUploads(id);
-      setFiles(toStoredUploadedFiles(uploadsData));
+      const uploaded = await uploadEvidenceFile(file);
 
       // Automatically complete "Upload floor plan" task if it exists and is pending
-      const uploadTask = tasks.find(t => t.type === "upload_file" && t.status === "pending");
+      const uploadTask = tasks.find(t => (t.type === "upload_file" || t.type === "upload_image") && t.status === "pending");
       if (uploadTask) {
-        await tasksService.updateTask(uploadTask.id, "completed");
-        handleTaskUpdate(uploadTask.id, "completed");
+        const updatedTask = await tasksService.updateTask(id, uploadTask.id, "completed", toTaskUploadAction(uploaded));
+        setTasks((prev) =>
+          prev.map((task) => (task.id === uploadTask.id ? ({ ...task, ...updatedTask } as Task) : task))
+        );
         await handleSendMessage("I've uploaded the requested file.");
       }
     } catch (error) {
       console.error("Failed to upload file", error);
-      alert("Failed to upload file to Firebase Storage. Please try again.");
+      alert("Failed to upload file. Please try again.");
+    }
+  };
+
+  const handleTaskFileUpload = async (_taskId: string, file: File): Promise<UploadedTaskAction> => {
+    const uploaded = await uploadEvidenceFile(file);
+    return toTaskUploadAction(uploaded);
+  };
+
+  const deleteEvidenceFile = async (fileId: string, showAlert = true) => {
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+
+    try {
+      await uploadsService.deleteUpload(id, fileId);
+    } catch (error) {
+      if (isUploadNotFoundError(error)) return;
+
+      console.error("Failed to delete file", error);
+      await refreshUploads().catch(() => undefined);
+      if (showAlert) {
+        alert("Failed to delete file. Please try again.");
+        return;
+      }
+      throw error;
     }
   };
 
   const handleFileDelete = async (fileId: string) => {
+    await deleteEvidenceFile(fileId);
+  };
+
+  const handleTaskDelete = async (taskId: string) => {
+    const task = tasks.find((item) => item.id === taskId);
+    const confirmed = window.confirm(`Remove "${task?.title || "this task"}" from this investigation?`);
+    if (!confirmed) return;
+
     try {
-      await uploadsService.deleteUpload(id, fileId);
-      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      await tasksService.deleteTask(id, taskId);
+      setTasks((prev) => prev.filter((item) => item.id !== taskId));
+      setStagedTaskActions((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+
+      if (activeTask?.id === taskId) {
+        setIsTaskModalOpen(false);
+        setActiveTask(null);
+      }
     } catch (error) {
-      console.error("Failed to delete file", error);
-      alert("Failed to delete file. Please try again.");
+      console.error("Failed to delete task", error);
+      alert("Failed to remove task. Please try again.");
     }
   };
 
@@ -300,8 +401,19 @@ export default function CaseWorkspace() {
           tasks={tasks} 
           disabled={sessionStatus === "archived"}
           onTaskUpdate={(taskId, status) => {
-            tasksService.updateTask(taskId, status).then(() => handleTaskUpdate(taskId, status));
+            tasksService
+              .updateTask(id, taskId, status)
+              .then((updatedTask) => {
+                setTasks((prev) =>
+                  prev.map((task) => (task.id === taskId ? ({ ...task, ...updatedTask } as Task) : task))
+                );
+              })
+              .catch((error) => {
+                console.error("Failed to update task", error);
+                alert("Failed to update task. Please try again.");
+              });
           }} 
+          onTaskDelete={handleTaskDelete}
           onTaskAction={handleTaskActionClick} 
         />
         {Object.keys(stagedTaskActions).length > 0 && (
@@ -353,7 +465,7 @@ export default function CaseWorkspace() {
         
         {/* Chat Area */}
         {/* ChatWindow needs to support our ChatMessage which has createdAt instead of role alone if modified, but let's assume it maps correctly */}
-        <ChatWindow messages={messages as any} />
+        <ChatWindow messages={messages} />
         
         {/* Input Area */}
         <div className="shrink-0">
@@ -365,10 +477,12 @@ export default function CaseWorkspace() {
         </div>
       </div>
       <TaskActionModal 
+        key={`${activeTask?.id || "none"}-${isTaskModalOpen ? "open" : "closed"}`}
         isOpen={isTaskModalOpen} 
         onClose={() => setIsTaskModalOpen(false)} 
         task={activeTask} 
         onSubmit={handleTaskActionSubmit}
+        onFileUpload={handleTaskFileUpload}
       />
       <EndSessionModal
         isOpen={isEndSessionModalOpen}
