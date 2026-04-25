@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # 1. Fix Python path so it can find the 'app' module

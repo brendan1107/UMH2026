@@ -51,21 +51,68 @@ async def update_task(
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: str,
+    data: dict,           # add data param to receive submitted_value + case_id
     db: firestore.Client = Depends(get_db),
     user: dict = Depends(get_current_user)
 ):
-    tasks_query = db.collection_group(InvestigationTask.SUBCOLLECTION).where(firestore.FieldPath.document_id(), "==", task_id).stream()
-    
+    tasks_query = db.collection_group(
+        InvestigationTask.SUBCOLLECTION
+    ).where(firestore.FieldPath.document_id(), "==", task_id).stream()
+
     task_doc = None
     for doc in tasks_query:
         task_doc = doc
         break
-        
+
     if not task_doc:
         raise HTTPException(status_code=404, detail="Task not found")
-        
-    task_doc.reference.update({"status": "completed"})
-    return {"status": "success"}
+
+    submitted_value = data.get("submitted_value")
+    task_doc.reference.update({
+        "status": "completed",
+        "submitted_value": submitted_value,
+    })
+
+    # ── Re-trigger agent now that user submitted evidence ──
+    case_id = data.get("case_id")
+    if case_id:
+        from app.ai.orchestrator import run_agent_turn
+        from app.ai.schemas import BusinessCase as AICase
+        from datetime import datetime
+
+        case_ref = db.collection(BusinessCase.COLLECTION).document(case_id)
+        case_data = case_ref.get().to_dict()
+
+        ai_case = AICase(
+            id=case_id,
+            idea=case_data.get("description", case_data.get("title", "")),
+            location=case_data.get("target_location", ""),
+            budget_myr=float(case_data.get("budget_myr", 30000)),
+            phase=case_data.get("ai_phase", "EVIDENCE"),
+            fact_sheet=case_data.get("fact_sheet", {}),
+            messages=case_data.get("ai_messages", []),
+        )
+
+        # Tell the agent what the user submitted
+        import json
+        ai_case.messages.append({
+            "role": "user",
+            "content": json.dumps({
+                "task_completed": task_id,
+                "submitted_value": submitted_value,
+            })
+        })
+
+        updated_case, _ = await run_agent_turn(ai_case)
+
+        case_ref.update({
+            "ai_phase":    updated_case.phase,
+            "fact_sheet":  updated_case.fact_sheet,
+            "ai_messages": updated_case.messages,
+            "updated_at":  datetime.utcnow(),
+        })
+
+    return {"status": "success", "task_id": task_id}
 
 @router.post("/{task_id}/skip")
 async def skip_task(

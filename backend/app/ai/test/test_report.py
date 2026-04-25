@@ -1,4 +1,16 @@
 import asyncio
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# 1. Fix Python path so it can find the 'app' module
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+
+# 2. Load .env BEFORE importing tools so the API key is injected
+load_dotenv(dotenv_path=Path(__file__).parent.parent.parent.parent / ".env")
 from app.ai.schemas import BusinessCase, AuditResult, RiskItem, VerdictOutput
 from app.ai.report import generate_report
 
