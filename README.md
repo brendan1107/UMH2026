@@ -1,3 +1,15 @@
+# Demo Video & Pitching Deck
+---
+[https://drive.google.com/drive/folders/12EEl-gi0VA_4cj8VrAiZ2DrG9XwC6vQ_?usp=drive_link](https://drive.google.com/drive/folders/12EEl-gi0VA_4cj8VrAiZ2DrG9XwC6vQ_?usp=drive_link)
+
+---
+
+# PRD SAD QATD 
+---
+[https://drive.google.com/drive/folders/1aPkpvJf9f3-vHYrxha24JQh3k5oaxeC0?usp=sharing](https://drive.google.com/drive/folders/1aPkpvJf9f3-vHYrxha24JQh3k5oaxeC0?usp=sharing)
+
+---
+
 # F&B Genie 🍜
 ### AI-Powered Business Feasibility Investigator for Malaysian F&B MSMEs
  
