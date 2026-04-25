@@ -115,19 +115,8 @@ INTAKE → MARKET_SCAN → TASK_ASSIGNMENT → EVIDENCE → VERDICT
 | MARKET_SCAN | Calls Google Places to fetch competitor count, ratings, proximity |
 | TASK_ASSIGNMENT | Emits field tasks for data that APIs cannot provide (footfall, rent) |
 | EVIDENCE | Waits for user to complete and submit field tasks |
-| VERDICT | All facts collected — agent issues GO / PIVOT / STOP |
+| VERDICT |  Facts collected — agent issues GO / PIVOT / STOP |
  
-### Required Facts Before Verdict
- 
-The agent **cannot issue a verdict** until all 5 facts are in the fact sheet:
- 
-| Fact | Source |
-|---|---|
-| `competitor_count` | Google Places API |
-| `avg_competitor_rating` | Google Places API |
-| `estimated_footfall_lunch` | Heuristic from Places data |
-| `confirmed_rent_myr` | User field task |
-| `break_even_covers` | `calculate_breakeven()` tool |
  
 ### Two-Pass AI Analysis
  
