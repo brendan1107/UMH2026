@@ -48,5 +48,11 @@ async def run_agent_turn(
             })
             return await run_agent_turn(case, _depth=_depth + 1)
 
-    case.phase = next_phase(case, output)
+    # Advance phase — if agent issued verdict, force phase to VERDICT
+    # regardless of whether all required facts are in fact_sheet
+    if output.type == "verdict":
+        case.phase = "VERDICT"
+    else:
+        case.phase = next_phase(case, output)
+
     return case, output
