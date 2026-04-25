@@ -8,7 +8,9 @@ export type TaskType =
   | "upload_file" 
   | "upload_image" 
   | "provide_text_input" 
-  | "review_ai_suggestions";
+  | "review_ai_suggestions"
+  | "select_location"
+  | "schedule_event";
 
 export interface Task {
   id: string;

@@ -2,7 +2,40 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import { Task } from "../tasks/TaskList";
+
+const mapContainerStyle = { width: "100%", height: "100%" };
+const defaultCenter = { lat: 37.7749, lng: -122.4194 };
+
+function MapSelector({ currentLocation, onSelect }: { currentLocation: any, onSelect: (loc: any) => void }) {
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "", 
+  });
+
+  const [markerPos, setMarkerPos] = useState<google.maps.LatLngLiteral | null>(currentLocation);
+
+  if (loadError) return <div className="p-4 text-red-500">Error loading maps</div>;
+  if (!isLoaded) return <div className="p-4 text-slate-500 flex justify-center items-center h-full">Loading Maps...</div>;
+
+  return (
+    <GoogleMap
+      mapContainerStyle={mapContainerStyle}
+      zoom={12}
+      center={markerPos || defaultCenter}
+      onClick={(e) => {
+        if (e.latLng) {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          setMarkerPos({ lat, lng });
+          onSelect({ lat, lng, address: `Selected Location (${lat.toFixed(4)}, ${lng.toFixed(4)})` });
+        }
+      }}
+    >
+      {markerPos && <Marker position={markerPos} />}
+    </GoogleMap>
+  );
+}
 
 interface TaskActionModalProps {
   isOpen: boolean;
@@ -15,6 +48,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
   const [textInput, setTextInput] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [location, setLocation] = useState<{lat: number, lng: number, address: string} | null>(null);
+  const [eventDate, setEventDate] = useState<string>("");
 
   if (!task) return null;
 
@@ -25,6 +60,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
     if (task.type === "provide_text_input") submitData = { text: textInput };
     if (task.type === "answer_questions") submitData = { answers };
     if (task.type === "choose_option") submitData = { selectedOption };
+    if (task.type === "select_location") submitData = { location };
+    if (task.type === "schedule_event") submitData = { eventDate };
     
     onSubmit(task.id, submitData);
     
@@ -32,6 +69,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
     setTextInput("");
     setAnswers({});
     setSelectedOption(null);
+    setLocation(null);
+    setEventDate("");
   };
 
   const renderContent = () => {
@@ -118,6 +157,82 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
           </div>
         );
 
+      case "select_location":
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 mb-4">{task.data?.description || "Select your location from the map:"}</p>
+            <div className="w-full h-64 bg-slate-100 rounded-lg overflow-hidden border border-slate-300 relative">
+              <MapSelector currentLocation={location} onSelect={setLocation} />
+            </div>
+            {location && (
+              <p className="text-xs text-green-600 font-medium">Selected: {location.address} ({location.lat}, {location.lng})</p>
+            )}
+          </div>
+        );
+
+      case "schedule_event":
+        const handleAutoGenerate = () => {
+          // Simulate AI filling in the event details
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(10, 0, 0, 0); // 10 AM tomorrow
+          
+          const offset = tomorrow.getTimezoneOffset() * 60000;
+          const localISOTime = (new Date(tomorrow.getTime() - offset)).toISOString().slice(0, 16);
+          setEventDate(localISOTime);
+        };
+
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-slate-600">{task.data?.description || "Save an event to Google Calendar:"}</p>
+              <button 
+                type="button" 
+                onClick={handleAutoGenerate}
+                className="text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm border border-purple-100"
+              >
+                ✨ Auto-generate with AI
+              </button>
+            </div>
+            <div className="p-4 border border-slate-200 rounded-lg bg-white">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-medium text-slate-900">{task.data?.eventTitle || "Investigation Meeting"}</h4>
+                  <p className="text-xs text-slate-500">{task.data?.eventDuration || "1 hour"}</p>
+                </div>
+              </div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Select Date & Time</label>
+              <input 
+                type="datetime-local" 
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-500">Requires Google Calendar permission</span>
+                <button type="button" className="text-xs text-blue-600 hover:text-blue-800 font-medium" onClick={async () => {
+                  try {
+                    const response = await fetch("http://127.0.0.1:8000/api/calendar/auth/url");
+                    const data = await response.json();
+                    if (data.auth_url) {
+                      window.open(data.auth_url, "_blank");
+                    }
+                  } catch (e) {
+                    alert("Failed to request calendar access.");
+                  }
+                }}>
+                  Grant Access
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return <p className="text-sm text-slate-600">Action details not available.</p>;
     }
@@ -130,6 +245,8 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
       return Object.keys(answers).length < requiredCount || Object.values(answers).some(val => !val.trim());
     }
     if (task.type === "provide_text_input") return !textInput.trim();
+    if (task.type === "select_location") return !location;
+    if (task.type === "schedule_event") return !eventDate;
     return false;
   };
 
@@ -144,13 +261,13 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
             onClick={onClose}
             className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
           />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+          <div className="fixed inset-y-0 right-0 z-50 flex items-center justify-end pointer-events-none sm:pr-4 py-4 w-full sm:w-[450px]">
             <motion.div
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="w-full max-w-2xl bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden flex flex-col max-h-[90vh] pointer-events-auto"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 100 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="w-full h-full bg-white border border-slate-200 shadow-2xl sm:rounded-2xl overflow-hidden flex flex-col pointer-events-auto"
             >
               <div className="flex justify-between items-center p-5 border-b border-slate-100">
                 <h2 className="text-lg font-semibold text-slate-900">
@@ -183,7 +300,7 @@ export default function TaskActionModal({ isOpen, onClose, task, onSubmit }: Tas
                   disabled={isSubmitDisabled()}
                   className="px-6 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Submit
+                  Save Action
                 </button>
               </div>
             </motion.div>
