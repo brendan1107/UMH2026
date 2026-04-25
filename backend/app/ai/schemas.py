@@ -28,15 +28,21 @@ class TaskQuestion(BaseModel):
     id: str
     label: str
 
-class FieldTaskOutput(BaseModel):
-    type: Literal["field_task"]
+class TaskDef(BaseModel):
     title: str
     instruction: str
+    ai_message: Optional[str] = None
+    follow_up_action: Optional[str] = None
     evidence_type: Literal["count", "photo", "rating", "text", "location", "schedule", "decision", "questions"]
     options: Optional[list[TaskOption]] = None
     questions: Optional[list[TaskQuestion]] = None
     event_title: Optional[str] = None
     event_duration: Optional[str] = None
+
+class TaskBatchOutput(BaseModel):
+    type: Literal["task_batch"]
+    chat_message: Optional[str] = None
+    tasks: list[TaskDef]
 
 class ClarifyOutput(BaseModel):
     type: Literal["clarify"]
@@ -51,7 +57,7 @@ class VerdictOutput(BaseModel):
     pivot_suggestion: Optional[str] = None  # only if PIVOT
 
 # Union — every GLM response must be one of these
-AgentOutput = ToolCallOutput | FieldTaskOutput | ClarifyOutput | VerdictOutput
+AgentOutput = ToolCallOutput | TaskBatchOutput | ClarifyOutput | VerdictOutput
 
 # ── Tool return types ──────────────────────────────────────
 class CompetitorResult(BaseModel):
@@ -86,7 +92,7 @@ class BusinessCase(BaseModel):
     id: str
     idea: str
     location: str
-    budget_myr: float
+    budget_myr: Optional[float] = None
     phase: Phase
     fact_sheet: dict[str, Any]   # grows as tools return data
     messages: list[dict]          # full GLM conversation history

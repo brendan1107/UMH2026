@@ -86,7 +86,7 @@ async def export_report_pdf(
         case_id=case_id,
         idea=case_data.get("description") or case_data.get("title") or "Unknown",
         location=case_data.get("target_location") or "Malaysia",
-        budget_myr=float(case_data.get("budget_myr") or 30000),
+        budget_myr=float(case_data.get("budget_myr")) if case_data.get("budget_myr") else None,
         verdict={
             "decision":         verdict_raw.get("verdict"),
             "confidence":       verdict_raw.get("confidence", 0.8),
@@ -126,7 +126,7 @@ async def generate_verdict(
         id=case_id,
         idea=case_data.get("description", case_data.get("title", "")),
         location=case_data.get("target_location", ""),
-        budget_myr=float(case_data.get("budget_myr", 30000)),
+        budget_myr=float(case_data.get("budget_myr")) if case_data.get("budget_myr") else None,
         phase=case_data.get("ai_phase", "VERDICT"),
         fact_sheet=case_data.get("fact_sheet", {}),
         messages=case_data.get("ai_messages", []),

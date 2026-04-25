@@ -6,6 +6,8 @@ interface ChatInputProps {
   onSendMessage: (content: string) => void;
   onFileUpload?: (file: File) => void;
   disabled?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
 const BLOCKED_PATTERNS = [
@@ -24,9 +26,12 @@ const ALLOWED_EXTENSIONS = [
   ".csv", ".xls", ".xlsx"
 ];
 
-export default function ChatInput({ onSendMessage, onFileUpload, disabled }: ChatInputProps) {
-  const [input, setInput] = useState("");
+export default function ChatInput({ onSendMessage, onFileUpload, disabled, value, onChange }: ChatInputProps) {
+  const [internalInput, setInternalInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const input = value !== undefined ? value : internalInput;
+  const setInput = onChange ? onChange : setInternalInput;
 
   const validateFile = (file: File): boolean => {
     const filename = file.name.toLowerCase();

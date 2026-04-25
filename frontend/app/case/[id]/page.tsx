@@ -107,6 +107,9 @@ export default function CaseWorkspace() {
   
   // Staged tasks state
   const [stagedTaskActions, setStagedTaskActions] = useState<Record<string, TaskActionData>>({});
+  
+  // Chat input state
+  const [chatInputText, setChatInputText] = useState("");
 
   const currentUser = auth.currentUser;
 
@@ -252,10 +255,10 @@ export default function CaseWorkspace() {
       }
       
       const finalContent = contents.join("\n\n");
-      await handleSendMessage(finalContent);
+      setChatInputText((prev) => prev ? prev + "\n\n" + finalContent : finalContent);
       setStagedTaskActions({});
     } catch (error) {
-      console.error("Failed to submit staged tasks", error);
+      console.error("Failed to stage tasks to chat input", error);
     }
   };
 
@@ -398,7 +401,8 @@ export default function CaseWorkspace() {
       </div>
       <div className="flex-1 overflow-y-auto">
         <TaskList 
-          tasks={tasks} 
+          tasks={tasks.filter(t => t.status !== "completed" || stagedTaskActions[t.id])} 
+          title="Investigation Tasks"
           disabled={sessionStatus === "archived"}
           onTaskUpdate={(taskId, status) => {
             tasksService
@@ -422,13 +426,19 @@ export default function CaseWorkspace() {
               onClick={handleSubmitAllTasks}
               className="w-full py-2.5 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 shadow-sm transition-colors flex items-center justify-center gap-2"
             >
-              <span>Submit All Completed Tasks</span>
+              <span>Draft Submission in Chat</span>
               <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">
                 {Object.keys(stagedTaskActions).length}
               </span>
             </button>
           </div>
         )}
+        <TaskList 
+          tasks={tasks.filter(t => t.status === "completed" && !stagedTaskActions[t.id])} 
+          title="Completed Tasks"
+          disabled={true}
+          onTaskUpdate={() => {}}
+        />
       </div>
       <UploadPanel
         files={files}
@@ -470,6 +480,8 @@ export default function CaseWorkspace() {
         {/* Input Area */}
         <div className="shrink-0">
           <ChatInput
+            value={chatInputText}
+            onChange={setChatInputText}
             onSendMessage={handleSendMessage}
             onFileUpload={handleFileUpload}
             disabled={sessionStatus === "archived"}

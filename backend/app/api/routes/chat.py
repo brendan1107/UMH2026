@@ -32,15 +32,15 @@ def _build_ai_case(case_id: str, case_data: dict) -> AICase:
         id=case_id,
         idea=case_data.get("description") or case_data.get("title") or "",
         location=case_data.get("target_location") or "",
-        budget_myr=float(case_data.get("budget_myr") or 30000),
+        budget_myr=float(case_data.get("budget_myr")) if case_data.get("budget_myr") else None,
         phase=case_data.get("ai_phase") or "INTAKE",
         fact_sheet=case_data.get("fact_sheet") or {},
         messages=case_data.get("ai_messages") or [],
     )
 
 
-def _create_task_from_field_task(case_ref, case_id: str, output) -> dict:
-    """Persist an AI field_task as a case task document."""
+def _create_tasks_from_batch(case_ref, case_id: str, output) -> list[dict]:
+    """Persist AI task_batch as case task documents."""
     now = datetime.utcnow()
     task_type_by_evidence = {
         "count": "provide_text_input",
@@ -62,30 +62,37 @@ def _create_task_from_field_task(case_ref, case_id: str, output) -> dict:
         "decision": "Make Decision",
         "questions": "Answer Questions",
     }
-    task_dict = {
-        "case_id": case_id,
-        "title": output.title,
-        "description": output.instruction,
-        "type": task_type_by_evidence.get(output.evidence_type, "provide_text_input"),
-        "status": "pending",
-        "action_label": action_label_by_evidence.get(output.evidence_type, "Submit evidence"),
-        "data": {
-            "description": output.instruction,
-            "evidence_type": output.evidence_type,
-            "options": [opt.model_dump() for opt in output.options] if getattr(output, 'options', None) else None,
-            "questions": [q.model_dump() for q in output.questions] if getattr(output, 'questions', None) else None,
-            "eventTitle": getattr(output, 'event_title', None),
-            "eventDuration": getattr(output, 'event_duration', None),
-        },
-        "source": "ai",
-        "created_at": now,
-        "updated_at": now,
-    }
+    
+    created_tasks = []
+    for task_def in output.tasks:
+        task_dict = {
+            "case_id": case_id,
+            "title": task_def.title,
+            "description": task_def.instruction,
+            "type": task_type_by_evidence.get(task_def.evidence_type, "provide_text_input"),
+            "status": "pending",
+            "ai_message": getattr(task_def, "ai_message", None),
+            "follow_up_action": getattr(task_def, "follow_up_action", None),
+            "action_label": action_label_by_evidence.get(task_def.evidence_type, "Submit evidence"),
+            "data": {
+                "description": task_def.instruction,
+                "evidence_type": task_def.evidence_type,
+                "options": [opt.model_dump() for opt in task_def.options] if getattr(task_def, 'options', None) else None,
+                "questions": [q.model_dump() for q in task_def.questions] if getattr(task_def, 'questions', None) else None,
+                "eventTitle": getattr(task_def, 'event_title', None),
+                "eventDuration": getattr(task_def, 'event_duration', None),
+            },
+            "source": "ai",
+            "created_at": now,
+            "updated_at": now,
+        }
 
-    task_ref = case_ref.collection(TASKS_SUBCOLLECTION).document()
-    task_ref.set(task_dict)
-    task_dict["id"] = task_ref.id
-    return snake_dict_to_camel(task_dict)
+        task_ref = case_ref.collection(TASKS_SUBCOLLECTION).document()
+        task_ref.set(task_dict)
+        task_dict["id"] = task_ref.id
+        created_tasks.append(snake_dict_to_camel(task_dict))
+        
+    return created_tasks
 
 
 @router.post("/{case_id}/sessions")
@@ -198,8 +205,8 @@ async def send_message(
     ai_dict = ai_msg.to_dict()
     ai_dict["ai_output_type"] = ai_output.type   # so frontend knows what to render
     ai_dict["ai_output_data"] = ai_output.model_dump()
-    if ai_output.type == "field_task":
-        ai_dict["created_task"] = _create_task_from_field_task(case_ref, case_id, ai_output)
+    if ai_output.type == "task_batch":
+        ai_dict["created_tasks"] = _create_tasks_from_batch(case_ref, case_id, ai_output)
     ai_msg_ref.set(ai_dict)
 
 
@@ -212,8 +219,8 @@ def _format_output_for_chat(output) -> str:
     """Convert AI output to human-readable string for simple display."""
     if output.type == "tool_call":
         return f"Investigating {output.tool.replace('_', ' ')}..."
-    elif output.type == "field_task":
-        return f"Mission: {output.title}\n\n{output.instruction}"
+    elif output.type == "task_batch":
+        return getattr(output, "chat_message", None) or "I have created new investigation tasks for you."
     elif output.type == "clarify":
         return output.question
     elif output.type == "verdict":

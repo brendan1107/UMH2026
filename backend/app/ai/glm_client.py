@@ -10,15 +10,20 @@ logger = logging.getLogger(__name__)
 
 def _development_fallback_output() -> AgentOutput:
     """Return a usable task when the configured local AI key is unavailable."""
-    from app.ai.schemas import FieldTaskOutput
-    return FieldTaskOutput(
-        type="field_task",
-        title="Confirm the target location and rent",
-        instruction=(
-            "Provide the exact target area or address and the expected monthly rent. "
-            "These details are required before the business idea can be assessed."
-        ),
-        evidence_type="text",
+    from app.ai.schemas import TaskBatchOutput, TaskDef
+    return TaskBatchOutput(
+        type="task_batch",
+        chat_message="Here is a task to get us started.",
+        tasks=[
+            TaskDef(
+                title="Confirm the target location and rent",
+                instruction=(
+                    "Provide the exact target area or address and the expected monthly rent. "
+                    "These details are required before the business idea can be assessed."
+                ),
+                evidence_type="text",
+            )
+        ]
     )
 
 
@@ -100,7 +105,7 @@ async def glm_call(
             # Google Search grounding — Gemini searches automatically
             # when it needs real-world data like rental prices,
             # competitor counts, footfall, market rates etc.
-            {"google_search": {}}
+            {"googleSearch": {}}
         ],
         "generation_config": {
             "temperature": 0.2,
@@ -214,7 +219,7 @@ async def glm_call(
 
     type_map = {
         "tool_call":  "ToolCallOutput",
-        "field_task": "FieldTaskOutput",
+        "task_batch": "TaskBatchOutput",
         "clarify":    "ClarifyOutput",
         "verdict":    "VerdictOutput",
     }

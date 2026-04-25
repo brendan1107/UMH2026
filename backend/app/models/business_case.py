@@ -31,7 +31,7 @@ class BusinessCase:
     # ai_phase: current phase of the ReAct investigation loop (INTAKE → VERDICT)
     # fact_sheet: grows as tools return data and user submits evidence
     # ai_messages: full GLM conversation history, persisted across turns
-    budget_myr: float = 30000.0
+    budget_myr: Optional[float] = None
     ai_phase: str = "INTAKE"
     fact_sheet: dict = field(default_factory=dict)
     ai_messages: list = field(default_factory=list)
@@ -68,7 +68,7 @@ class BusinessCase:
             created_at=data.get("created_at", datetime.utcnow()),
             updated_at=data.get("updated_at", datetime.utcnow()),
             # AI state
-            budget_myr=float(data.get("budget_myr", 30000.0)),
+            budget_myr=float(data.get("budget_myr")) if data.get("budget_myr") else None,
             ai_phase=data.get("ai_phase", "INTAKE"),
             fact_sheet=data.get("fact_sheet", {}),
             ai_messages=data.get("ai_messages", []),

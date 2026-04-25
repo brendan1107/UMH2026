@@ -55,6 +55,7 @@ export interface TaskCreatePayload {
   type?: TaskType;
   status?: TaskStatus;
   actionLabel?: string;
+  followUpAction?: string;
   data?: Record<string, unknown>;
   source?: string;
 }
@@ -66,7 +67,9 @@ export interface InvestigationTask {
   description?: string;
   status: TaskStatus;
   type: TaskType;
+  aiMessage?: string;
   actionLabel?: string;
+  followUpAction?: string;
   data?: Record<string, unknown>;
   source?: string;
   submittedValue?: TaskActionData;

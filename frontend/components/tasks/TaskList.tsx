@@ -15,7 +15,9 @@ export interface Task {
   title: string;
   status: "pending" | "scheduled" | "skipped" | "completed";
   type?: TaskType;
+  aiMessage?: string;
   actionLabel?: string;
+  followUpAction?: string;
   data?: Record<string, unknown>; // For options, questions, etc.
 }
 
@@ -25,13 +27,16 @@ interface TaskListProps {
   onTaskUpdate: (taskId: string, newStatus: Task["status"]) => void;
   onTaskDelete?: (taskId: string) => void;
   onTaskAction?: (task: Task) => void;
+  title?: string;
 }
 
-export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskDelete, onTaskAction }: TaskListProps) {
+export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskDelete, onTaskAction, title = "Investigation Tasks" }: TaskListProps) {
+  if (tasks.length === 0) return null;
+
   return (
     <div className="p-4">
       <h3 className="text-xs font-semibold text-slate-500  uppercase tracking-wider mb-3">
-        Investigation Tasks
+        {title}
       </h3>
       <div className="space-y-3">
         {tasks.map((task) => {
@@ -105,6 +110,23 @@ export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskDelete, 
                       {task.title}
                     </p>
                     
+                    {task.aiMessage && (
+                      <p className="text-xs text-slate-500 italic mt-0.5 border-l-2 border-slate-200 pl-2">
+                        {task.aiMessage}
+                      </p>
+                    )}
+                    
+                    {task.followUpAction && (
+                      <div className="mt-1 flex items-start gap-1.5 p-2 bg-blue-50/50 rounded border border-blue-100">
+                        <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <p className="text-xs text-blue-700 font-medium leading-snug">
+                          <span className="font-semibold">AI Suggestion:</span> {task.followUpAction}
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       {isCompleted && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-100  text-green-800  uppercase tracking-wide">
@@ -157,7 +179,7 @@ export default function TaskList({ tasks, disabled, onTaskUpdate, onTaskDelete, 
         })}
         {tasks.length === 0 && (
           <p className="text-sm text-slate-500  italic p-3 text-center border border-dashed border-slate-200  rounded-lg">
-            No tasks assigned yet.
+            No tasks found.
           </p>
         )}
       </div>

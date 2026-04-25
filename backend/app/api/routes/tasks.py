@@ -203,7 +203,7 @@ async def complete_task(
             id=case_id,
             idea=case_data.get("description") or case_data.get("title") or "",
             location=case_data.get("target_location") or "",
-            budget_myr=float(case_data.get("budget_myr") or 30000),
+            budget_myr=float(case_data.get("budget_myr")) if case_data.get("budget_myr") else None,
             phase=case_data.get("ai_phase") or "EVIDENCE",
             fact_sheet=case_data.get("fact_sheet") or {},
             messages=case_data.get("ai_messages") or [],
