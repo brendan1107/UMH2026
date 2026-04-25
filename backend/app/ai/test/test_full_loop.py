@@ -54,23 +54,32 @@ async def simulate_full_case():
 
     max_turns = 30  # increased to allow multiple verdict cycles
     turn = 0
+    output = None
 
-    while turn < max_turns:
+    while case.phase != "VERDICT" and turn < max_turns:
         turn += 1
-        print(f"[Turn {turn} | Phase: {case.phase}]")
+        print(f"── Turn {turn} | Phase: {case.phase} ──")
+        
+        case, output = await run_agent_turn(case)
 
-        from app.ai.schemas import CompetitorResult, FootfallEstimate, BreakevenModel
-        mock_comp.return_value  = CompetitorResult(count=6, avg_rating=4.1, nearest_m=120, price_levels=[1, 2, 2, 1, 2, 2])
-        mock_foot.return_value  = FootfallEstimate(estimated_pax_per_hour=90, peak_hours=["12:00-14:00"], confidence="medium")
-        mock_bev.return_value   = BreakevenModel(breakeven_covers_per_day=87, months_to_breakeven=8.5, min_viable_revenue_myr=13500.0)
+        print(f"   GLM output type : {output.type}")
 
-        while case.phase != "VERDICT" and turn < max_turns:
-            turn += 1
-            print(f"── Turn {turn} | Phase: {case.phase} ──")
+        if output.type == "clarify":
+            print(f"❓ CLARIFY: {output.question}")
+            for i, opt in enumerate(output.options):
+                print(f"   {i+1}. {opt}")
+            choice = input("   Choose an option (number): ").strip()
             
-            case, output = await run_agent_turn(case)
-
-            print(f"   GLM output type : {output.type}")
+            try:
+                answer = output.options[int(choice)-1]
+            except (ValueError, IndexError):
+                answer = choice  # Fallback to raw text if they didn't type a number
+                
+            case.messages.append({
+                "role": "user",
+                "content": f"Answer: {answer}"
+            })
+            print(f"   You chose: {answer}\n")
 
         elif output.type == "field_task":
             print(f"📋 FIELD TASK: {output.title}")
@@ -115,41 +124,7 @@ async def simulate_full_case():
                     "task_completed": output.title,
                     "submitted_facts": case.fact_sheet,
                 })
-            
-            elif output.type == "field_task":
-                print(f"   Task emitted    : {output.title}")
-                print(f"   [Simulating user submitting ALL realistic evidence...]")
-                
-                # Give the AI sensible data so it doesn't freak out
-                case.fact_sheet["competitor_count"] = 6
-                case.fact_sheet["avg_competitor_rating"] = 4.1
-                case.fact_sheet["estimated_footfall_lunch"] = 90
-                case.fact_sheet["confirmed_rent_myr"] = 3200
-                case.fact_sheet["break_even_covers"] = 87
-                
-                case.messages.append({
-                    "role": "user",
-                    "content": json.dumps({
-                        "task_completed": output.title,
-                        "submitted_value": "All missing facts have been collected and updated in the fact sheet."
-                    })
-                })
-                
-            elif output.type == "verdict":
-                # The AI has made its final decision, break the loop!
-                case.phase = "VERDICT"
-
-            print()
-
-    print("═══ VERDICT REACHED ═══")
-    print(f"Turns taken  : {turn}")
-    print(f"Final phase  : {case.phase}")
-
-            case.messages.append({
-                "role": "user",
-                "content": f"Answer: {answer}"
             })
-            print(f"   You chose: {answer}\n")
 
         elif output.type == "verdict":
             # ── Print verdict ──
@@ -186,7 +161,7 @@ async def simulate_full_case():
             case.phase = "EVIDENCE"
             print()
 
-        print("─" * 50 + "\n")
+    print("─" * 50 + "\n")
 
     # ── Final summary ──
     print("═══ INVESTIGATION COMPLETE ═══\n")
