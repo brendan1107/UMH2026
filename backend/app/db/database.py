@@ -37,7 +37,50 @@ if not credential_path.is_absolute():
 db = None
 bucket = None
 
-if credential_path.exists():
+if settings.FIREBASE_PRIVATE_KEY and settings.FIREBASE_CLIENT_EMAIL:
+    try:
+        # Load from env vars
+        cert_dict = {
+            "type": "service_account",
+            "project_id": settings.FIREBASE_PROJECT_ID,
+            "private_key_id": settings.FIREBASE_PRIVATE_KEY_ID,
+            "private_key": settings.FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+            "client_email": settings.FIREBASE_CLIENT_EMAIL,
+            "client_id": settings.FIREBASE_CLIENT_ID,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{settings.FIREBASE_CLIENT_EMAIL}"
+        }
+        _cred = credentials.Certificate(cert_dict)
+        app_options = {}
+        if settings.FIREBASE_STORAGE_BUCKET:
+            app_options["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
+        _app = firebase_admin.initialize_app(_cred, app_options)
+
+        # Firestore client
+        db = firestore.client()
+        logger.info("Firestore client initialized successfully from environment variables.")
+
+        # Storage bucket
+        if settings.FIREBASE_STORAGE_BUCKET:
+            bucket = storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+            logger.info(
+                "Firebase Storage bucket initialized: %s",
+                settings.FIREBASE_STORAGE_BUCKET,
+            )
+        else:
+            logger.warning(
+                "FIREBASE_STORAGE_BUCKET is not configured. "
+                "Uploads will use metadata-only fallback."
+            )
+    except Exception as exc:
+        firebase_initialization_error = exc
+        db = None
+        bucket = None
+        logger.error("Firebase initialization failed from env vars: %s", exc)
+
+elif credential_path.exists():
     try:
         # Initialize Firebase Admin SDK
         _cred = credentials.Certificate(str(credential_path))
@@ -69,10 +112,10 @@ if credential_path.exists():
         logger.error("Firebase initialization failed: %s", exc)
 else:
     firebase_initialization_error = FileNotFoundError(
-        f"Firebase credentials file not found: {credential_path}"
+        f"Firebase credentials file not found: {credential_path} and environment variables not set."
     )
     logger.warning(
-        "Firebase credentials file not found at '%s'. "
+        "Firebase credentials file not found at '%s' and env vars not set. "
         "Using local fallback mode (no Firestore/Storage).",
         credential_path,
     )
