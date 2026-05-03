@@ -5,13 +5,13 @@ run offline with no Firebase credentials required.
 """
 
 import os
+from uuid import uuid4
 
 # Must be set before any app module is imported
 os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("FIREBASE_PROJECT_ID", "test-project")
 
 import pytest
-from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.main import create_app

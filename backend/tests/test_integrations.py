@@ -21,7 +21,7 @@ class TestGLMClient:
 
     @pytest.mark.asyncio
     async def test_chat_completion_strips_markdown_fence(self):
-        """chat_completion should unwrap ```json ... ``` fences from the response."""
+        """chat_completion should unwrap markdown json fences from the response."""
         from app.integrations.glm_client import GLMClient
 
         mock_resp = MagicMock()
